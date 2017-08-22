@@ -876,7 +876,7 @@ void FlowGraphCompiler::CopyParameters() {
   }
 
   __ Bind(&wrong_num_arguments);
-  if (function.IsClosureFunction()) {
+  if (function.IsClosureFunction() || function.IsConvertedClosureFunction()) {
     __ LeaveDartFrame(kKeepCalleePP);  // The arguments are still on the stack.
     __ Jmp(*StubCode::CallClosureNoSuchMethod_entry());
     // The noSuchMethod call may return to the caller, but not here.
@@ -992,8 +992,9 @@ void FlowGraphCompiler::CompileGraph() {
   // No such checking code is generated if only fixed parameters are declared,
   // unless we are in debug mode or unless we are compiling a closure.
   if (num_copied_params == 0) {
-    const bool check_arguments =
-        function.IsClosureFunction() && !flow_graph().IsCompiledForOsr();
+    const bool check_arguments = (function.IsClosureFunction() ||
+                                  function.IsConvertedClosureFunction()) &&
+                                 !flow_graph().IsCompiledForOsr();
     if (check_arguments) {
       __ Comment("Check argument count");
       // Check that exactly num_fixed arguments are passed in.

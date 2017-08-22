@@ -3464,8 +3464,13 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfConvertedClosureFunction(
   // closures its context field contains the context vector that is used by the
   // converted top-level function (target) explicitly and that should be passed
   // to that function as the first parameter.
-  body += LoadLocal(LookupVariable(
-      ReaderOffset() + relative_kernel_offset_));  // 0th variable offset.
+  LocalVariable* var = LookupVariable(ReaderOffset() + relative_kernel_offset_);
+  LocalVariable* parameter =
+      new (Z) LocalVariable(TokenPosition::kNoSource, TokenPosition::kNoSource,
+                            Symbols::TempParam(), var->type());
+  parameter->set_index(parsed_function()->first_parameter_index());
+  if (var->is_captured()) parameter->set_is_captured_parameter(true);
+  body += LoadLocal(parameter);  // 0th variable offset.
   body += flow_graph_builder_->LoadField(Closure::context_offset());
   LocalVariable* context = MakeTemporary();
 

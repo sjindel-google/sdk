@@ -6,6 +6,7 @@ library kernel.transformations.closure.converter;
 
 import '../../ast.dart'
     show
+        AsyncMarker,
         Arguments,
         Block,
         Catch,
@@ -347,6 +348,10 @@ class ClosureConverter extends Transformer {
   }
 
   Expression handleLocalFunction(FunctionNode function) {
+    if (function.asyncMarker == AsyncMarker.SyncYielding) {
+      function.transformChildren(this);
+      return new FunctionExpression(function);
+    }
     FunctionNode enclosingFunction = currentFunction;
     Map<TypeParameter, DartType> enclosingTypeSubstitution = typeSubstitution;
     currentFunction = function;
@@ -554,6 +559,11 @@ class ClosureConverter extends Transformer {
   TreeNode visitBlock(Block node) {
     return saveContext(() {
       BlockRewriter blockRewriter = rewriter = rewriter.forNestedBlock(node);
+      if (node.parent is Statement &&
+          (node.parent as Statement).isLoop &&
+          context is! NoContext) {
+        context = context.toNestedContext();
+      }
       blockRewriter.transformStatements(this);
       return node;
     });
