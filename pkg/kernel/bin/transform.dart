@@ -104,7 +104,7 @@ Future<CompilerOutcome> runTransformation(List<String> arguments) async {
       throw 'Unknown transformation';
   }
 
-  verifyProgram(program);
+  // verifyProgram(program);
 
   if (format == 'text') {
     writeProgramToText(program, path: output);

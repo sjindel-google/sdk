@@ -13,6 +13,8 @@ import '../transformations/continuation.dart' as transformAsync
     show transformLibraries;
 import '../transformations/erasure.dart' as tranformErasure
     show transformLibraries;
+import '../transformations/closure_conversion.dart' as transformClosures
+    show transformLibraries;
 
 import 'targets.dart' show TargetFlags;
 import 'vm.dart' as vm_target;
@@ -33,6 +35,9 @@ class VmFastaTarget extends vm_target.VmTarget {
       tranformErasure.transformLibraries(coreTypes, libraries);
       logger?.call("Erased type variables in generic methods");
     }
+
+    transformClosures.transformLibraries(coreTypes, libraries);
+    logger?.call("Transformed closures");
 
     // TODO(kmillikin): Make this run on a per-method basis.
     transformAsync.transformLibraries(coreTypes, libraries);
