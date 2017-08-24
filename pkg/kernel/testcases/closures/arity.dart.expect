@@ -16,8 +16,12 @@ static method main() → dynamic {
       throw core::Exception::•("Expected an error!");
     }
   }
+  (MakeClosure<(dynamic, dynamic, [dynamic]) → dynamic>(self::closure#main#function#4, null)).call(1, 2);
+  (MakeClosure<(dynamic, dynamic, [dynamic]) → dynamic>(self::closure#main#function#5, null)).call(1, 2, 3);
 }
 static method closure#main#function(Vector #contextParameter, dynamic x, dynamic y, [dynamic z]) → dynamic {}
 static method closure#main#function#1(Vector #contextParameter, dynamic x, dynamic y, dynamic z) → dynamic {}
 static method closure#main#function#2(Vector #contextParameter, dynamic x, dynamic y, {dynamic z}) → dynamic {}
 static method closure#main#function#3(Vector #contextParameter, dynamic x, dynamic y, dynamic z, dynamic w, dynamic v) → dynamic {}
+static method closure#main#function#4(Vector #contextParameter, dynamic x, dynamic y, [dynamic z]) → dynamic {}
+static method closure#main#function#5(Vector #contextParameter, dynamic x, dynamic y, [dynamic z]) → dynamic {}

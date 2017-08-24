@@ -14,6 +14,7 @@ import '../../ast.dart'
         ClosureCreation,
         Constructor,
         DartType,
+        DoStatement,
         EmptyStatement,
         Expression,
         ExpressionStatement,
@@ -53,6 +54,7 @@ import '../../ast.dart'
         VariableSet,
         VectorCreation,
         VectorType,
+        WhileStatement,
         transformList;
 
 import '../../frontend/accessors.dart' show VariableAccessor;
@@ -70,6 +72,13 @@ import 'context.dart' show Context, NoContext, LocalContext;
 import 'info.dart' show ClosureInfo;
 
 import 'rewriter.dart' show AstRewriter, BlockRewriter, InitializerListRewriter;
+
+bool isLoop(TreeNode node) {
+  return node is WhileStatement ||
+      node is DoStatement ||
+      node is ForStatement ||
+      node is ForInStatement;
+}
 
 class ClosureConverter extends Transformer {
   final CoreTypes coreTypes;
@@ -560,7 +569,7 @@ class ClosureConverter extends Transformer {
     return saveContext(() {
       BlockRewriter blockRewriter = rewriter = rewriter.forNestedBlock(node);
       if (node.parent is Statement &&
-          (node.parent as Statement).isLoop &&
+          isLoop(node.parent) &&
           context is! NoContext) {
         context = context.toNestedContext();
       }

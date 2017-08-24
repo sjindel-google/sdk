@@ -3178,7 +3178,6 @@ class ClosureCreation extends Expression {
 abstract class Statement extends TreeNode {
   accept(StatementVisitor v);
   accept1(StatementVisitor1 v, arg);
-  bool get isLoop => false;
 }
 
 /// A statement with a compile-time error.
@@ -3364,8 +3363,6 @@ class WhileStatement extends Statement {
       body?.parent = this;
     }
   }
-
-  bool get isLoop => true;
 }
 
 class DoStatement extends Statement {
@@ -3395,8 +3392,6 @@ class DoStatement extends Statement {
       condition?.parent = this;
     }
   }
-
-  bool get isLoop => true;
 }
 
 class ForStatement extends Statement {
@@ -3434,8 +3429,6 @@ class ForStatement extends Statement {
       body?.parent = this;
     }
   }
-
-  bool get isLoop => true;
 }
 
 class ForInStatement extends Statement {
@@ -3480,8 +3473,6 @@ class ForInStatement extends Statement {
       body?.parent = this;
     }
   }
-
-  bool get isLoop => true;
 }
 
 /// Statement of form `switch (e) { case x: ... }`.
