@@ -770,7 +770,8 @@ void FlowGraphCompiler::CopyParameters() {
 #ifdef DEBUG
   const bool check_correct_named_args = true;
 #else
-  const bool check_correct_named_args = function.IsClosureFunction();
+  const bool check_correct_named_args =
+      function.IsClosureFunction() || function.IsConvertedClosureFunction();
 #endif
   if (num_opt_named_params > 0) {
     // Start by alphabetically sorting the names of the optional parameters.
