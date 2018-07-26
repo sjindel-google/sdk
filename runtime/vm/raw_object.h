@@ -901,6 +901,7 @@ class RawFunction : public RawObject {
   static bool CheckUsageCounter(RawFunction* raw_fun);
 
   uword entry_point_;  // Accessed from generated code.
+  uword entry_point_skipping_type_checks_;  // Accessed from generated code.
 
   VISIT_FROM(RawObject*, name_);
   RawString* name_;
@@ -1297,6 +1298,9 @@ class RawCode : public RawObject {
   // offsets.
   // Alive: If true, the embedded object pointers will be visited during GC.
   int32_t state_bits_;
+
+  uword entry_point_skipping_type_checks_;  // Accessed from generated code (JIT only).
+  uword entry_point_skipping_type_checks_pc_;
 
   // Variable length data follows here.
   int32_t* data() { OPEN_ARRAY_START(int32_t, int32_t); }

@@ -2303,6 +2303,10 @@ class Function : public Object {
     return OFFSET_OF(RawFunction, entry_point_);
   }
 
+  static intptr_t entry_point_skipping_type_checks_offset() {
+    return OFFSET_OF(RawFunction, entry_point_skipping_type_checks_);
+  }
+
 #if defined(DART_USE_INTERPRETER)
   void AttachBytecode(const Code& bytecode) const;
   RawCode* Bytecode() const { return raw_ptr()->bytecode_; }
@@ -2470,6 +2474,8 @@ class Function : public Object {
     }
     return I->type_checks();
   }
+
+  bool MayHaveEntryPointSkippingTypeChecks(Isolate* I) const;
 
   TokenPosition token_pos() const {
 #if defined(DART_PRECOMPILED_RUNTIME)
@@ -4800,6 +4806,9 @@ class Code : public Object {
   static intptr_t checked_entry_point_offset() {
     return OFFSET_OF(RawCode, checked_entry_point_);
   }
+  static intptr_t entry_point_skipping_type_checks_offset() {
+    return OFFSET_OF(RawCode, entry_point_skipping_type_checks_);
+  }
 
   RawObjectPool* object_pool() const { return raw_ptr()->object_pool_; }
   static intptr_t object_pool_offset() {
@@ -5114,6 +5123,23 @@ class Code : public Object {
   }
 
   bool IsDisabled() const { return instructions() != active_instructions(); }
+
+  uword entry_point_skipping_type_checks() const {
+    return raw_ptr()->entry_point_skipping_type_checks_;
+  }
+
+  void set_entry_point_skipping_type_checks(uword value) const {
+    StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_, value);
+  }
+
+  uword entry_point_skipping_type_checks_pc() const {
+    return raw_ptr()->entry_point_skipping_type_checks_pc_;
+  }
+
+  void set_entry_point_skipping_type_checks_pc(uword value) const {
+    StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_pc_,
+                    value);
+  }
 
  private:
   void set_state_bits(intptr_t bits) const;

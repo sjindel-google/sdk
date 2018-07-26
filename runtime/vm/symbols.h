@@ -60,6 +60,7 @@ class ObjectPointerVisitor;
   V(_DeletedEnumSentinel, "_deleted_enum_sentinel")                            \
   V(_DeletedEnumPrefix, "Deleted enum value from ")                            \
   V(ExprTemp, ":expr_temp")                                                    \
+  V(EntryPointsTemp, ":entry_points_temp")                                     \
   V(FinallyRetVal, ":finally_ret_val")                                         \
   V(AnonymousClosure, "<anonymous closure>")                                   \
   V(AnonymousSignature, "<anonymous signature>")                               \

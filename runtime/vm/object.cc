@@ -5737,6 +5737,8 @@ void Function::SetInstructions(const Code& value) const {
 void Function::SetInstructionsSafe(const Code& value) const {
   StorePointer(&raw_ptr()->code_, value.raw());
   StoreNonPointer(&raw_ptr()->entry_point_, value.UncheckedEntryPoint());
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  value.entry_point_skipping_type_checks());
 }
 
 void Function::AttachCode(const Code& value) const {
@@ -8069,6 +8071,10 @@ RawCode* Function::EnsureHasCode() const {
   ASSERT(HasCode());
   ASSERT(unoptimized_code() == result.raw());
   return CurrentCode();
+}
+
+bool Function::MayHaveEntryPointSkippingTypeChecks(Isolate* I) const {
+  return NeedsArgumentTypeChecks(I) && !IsClosureFunction();
 }
 
 const char* Function::ToCString() const {
@@ -14917,6 +14923,7 @@ RawCode* Code::New(intptr_t pointer_offsets_length) {
     result.set_comments(Comments::New(0));
     result.set_compile_timestamp(0);
     result.set_pc_descriptors(Object::empty_descriptors());
+    result.set_entry_point_skipping_type_checks_pc(0);
   }
   return result.raw();
 }
@@ -15291,6 +15298,9 @@ void Code::SetActiveInstructions(const Instructions& instructions) const {
                   Instructions::UncheckedEntryPoint(instructions.raw()));
   StoreNonPointer(&raw_ptr()->checked_entry_point_,
                   Instructions::CheckedEntryPoint(instructions.raw()));
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  instructions.PayloadStart() +
+                  raw_ptr()->entry_point_skipping_type_checks_pc_);
 #endif
 }
 

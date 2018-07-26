@@ -1716,11 +1716,16 @@ BlockEntryInstr* Instruction::SuccessorAt(intptr_t index) const {
 }
 
 intptr_t GraphEntryInstr::SuccessorCount() const {
-  return 1 + catch_entries_.length();
+  return 1 + (entry_skipping_type_checks() == nullptr ? 0 : 1) +
+         catch_entries_.length();
 }
 
 BlockEntryInstr* GraphEntryInstr::SuccessorAt(intptr_t index) const {
   if (index == 0) return normal_entry_;
+  if (entry_skipping_type_checks() != nullptr) {
+    if (index == 1) return entry_skipping_type_checks();
+    return catch_entries_[index - 2];
+  }
   return catch_entries_[index - 1];
 }
 
@@ -3531,6 +3536,16 @@ LocationSummary* TargetEntryInstr::MakeLocationSummary(Zone* zone,
 
 void TargetEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(compiler->GetJumpLabel(this));
+
+  // SAMIR_TODO: Make the treatment of the alternate entry-point and the default
+  // entry-point more uniform so that edge-counters can determine the which
+  // entry-point's prologue comes first.
+  if (this ==
+      compiler->flow_graph().graph_entry()->entry_skipping_type_checks()) {
+    compiler->entry_point_skipping_type_checks = __ CodeSize();
+    compiler->EmitPrologue();
+  }
+
   if (!compiler->is_optimizing()) {
 #if !defined(TARGET_ARCH_DBC)
     // TODO(vegorov) re-enable edge counters on DBC if we consider them

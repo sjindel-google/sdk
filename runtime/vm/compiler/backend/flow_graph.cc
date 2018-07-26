@@ -407,7 +407,11 @@ void FlowGraph::ComputeIsReceiver(PhiInstr* phi) const {
 bool FlowGraph::IsReceiver(Definition* def) const {
   def = def->OriginalDefinition();  // Could be redefined.
   if (def->IsParameter()) return (def->AsParameter()->index() == 0);
-  if (!def->IsPhi() || graph_entry()->catch_entries().is_empty()) return false;
+  if (!def->IsPhi() ||
+      (graph_entry()->catch_entries().is_empty() &&
+       graph_entry()->entry_skipping_type_checks() == nullptr)) {
+    return false;
+  }
   PhiInstr* phi = def->AsPhi();
   if (phi->is_receiver() != PhiInstr::kUnknownReceiver) {
     return (phi->is_receiver() == PhiInstr::kReceiver);

@@ -388,6 +388,8 @@ class FlowGraphCompiler : public ValueObject {
 
   void CompileGraph();
 
+  void EmitPrologue();
+
   void VisitBlocks();
 
   // Bail out of the flow graph compiler. Does not return to the caller.
@@ -640,6 +642,7 @@ class FlowGraphCompiler : public ValueObject {
 
   void AddSlowPathCode(SlowPathCode* slow_path);
 
+  void FinalizeEntryPoints(const Code& code);
   void FinalizeExceptionHandlers(const Code& code);
   void FinalizePcDescriptors(const Code& code);
   RawArray* CreateDeoptInfo(Assembler* assembler);
@@ -737,6 +740,8 @@ class FlowGraphCompiler : public ValueObject {
                                      const CidRange& range,
                                      int bias,
                                      bool jump_on_miss = true);
+
+  uword entry_point_skipping_type_checks = 0;
 
  private:
   friend class CheckStackOverflowSlowPath;  // For pending_deoptimization_env_.

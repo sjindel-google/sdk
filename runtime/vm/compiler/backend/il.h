@@ -1521,6 +1521,14 @@ class GraphEntryInstr : public BlockEntryInstr {
   }
   TargetEntryInstr* normal_entry() const { return normal_entry_; }
 
+  TargetEntryInstr* entry_skipping_type_checks() const {
+    return entry_skipping_type_checks_;
+  }
+
+  void set_entry_skipping_type_checks(TargetEntryInstr* target) {
+    entry_skipping_type_checks_ = target;
+  }
+
   const ParsedFunction& parsed_function() const { return parsed_function_; }
 
   const GrowableArray<CatchBlockEntryInstr*>& catch_entries() const {
@@ -1539,6 +1547,7 @@ class GraphEntryInstr : public BlockEntryInstr {
 
   const ParsedFunction& parsed_function_;
   TargetEntryInstr* normal_entry_;
+  TargetEntryInstr* entry_skipping_type_checks_ = nullptr;
   GrowableArray<CatchBlockEntryInstr*> catch_entries_;
   // Indirect targets are blocks reachable only through indirect gotos.
   GrowableArray<IndirectEntryInstr*> indirect_entries_;

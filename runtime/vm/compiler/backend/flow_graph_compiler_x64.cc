@@ -847,19 +847,8 @@ void FlowGraphCompiler::EmitFrameEntry() {
   }
 }
 
-void FlowGraphCompiler::CompileGraph() {
-  InitCompiler();
-#ifdef DART_PRECOMPILER
-  const Function& function = parsed_function().function();
-  if (function.IsDynamicFunction()) {
-    __ MonomorphicCheckedEntry();
-  }
-#endif  // DART_PRECOMPILER
-
-  if (TryIntrinsify()) {
-    // Skip regular code generation.
-    return;
-  }
+void FlowGraphCompiler::EmitPrologue() {
+  BeginCodeSourceRange();
 
   EmitFrameEntry();
   ASSERT(assembler()->constant_pool_allowed());
@@ -885,6 +874,28 @@ void FlowGraphCompiler::CompileGraph() {
   }
 
   EndCodeSourceRange(TokenPosition::kDartCodePrologue);
+}
+
+void FlowGraphCompiler::CompileGraph() {
+  InitCompiler();
+#ifdef DART_PRECOMPILER
+  const Function& function = parsed_function().function();
+  if (function.IsDynamicFunction()) {
+    __ MonomorphicCheckedEntry();
+  }
+#endif  // DART_PRECOMPILER
+
+  // Always set the safe entry-point to a valid entry position, even if we're
+  // not emitting special code for it.
+  entry_point_skipping_type_checks = __ CodeSize();
+
+  if (TryIntrinsify()) {
+    // Skip regular code generation.
+    return;
+  }
+
+  EmitPrologue();
+
   ASSERT(!block_order().is_empty());
   VisitBlocks();
 

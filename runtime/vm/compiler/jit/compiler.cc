@@ -647,6 +647,7 @@ RawCode* CompileParsedFunctionHelper::FinalizeCompilation(
   graph_compiler->FinalizeCatchEntryStateMap(code);
   graph_compiler->FinalizeStaticCallTargetsTable(code);
   graph_compiler->FinalizeCodeSourceMap(code);
+  graph_compiler->FinalizeEntryPoints(code);
 
   if (optimized()) {
     // Installs code while at safepoint.

@@ -26,6 +26,8 @@
 
 namespace dart {
 
+volatile int ctr = 0;
+
 DEFINE_FLAG(int,
             deoptimization_counter_inlining_threshold,
             12,
@@ -1362,6 +1364,9 @@ class CallSiteInliner : public ValueObject {
       }
 
       const Function& target = call->function();
+      if (strstr(target.ToCString(), "samir1") != 0) {
+        ++ctr;
+      }
       if (!inliner_->AlwaysInline(target) &&
           (call_info[call_idx].ratio * 100) < FLAG_inlining_hotness) {
         if (trace_inlining()) {
