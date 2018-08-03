@@ -1291,7 +1291,9 @@ bool FlowGraphCompiler::NeedsEdgeCounter(TargetEntryInstr* block) {
   // except for the entry block.
   return (FLAG_reorder_basic_blocks &&
           (!block->last_instruction()->IsGoto() ||
-           (block == flow_graph().graph_entry()->normal_entry())));
+           (block == flow_graph().graph_entry()->normal_entry()) ||
+           // SAMIR_TODO: do we need this?
+           (block == flow_graph().graph_entry()->entry_skipping_type_checks())));
 }
 
 // Allocate a register that is not explictly blocked.

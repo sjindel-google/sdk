@@ -3537,11 +3537,17 @@ LocationSummary* TargetEntryInstr::MakeLocationSummary(Zone* zone,
 void TargetEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(compiler->GetJumpLabel(this));
 
+  if (this ==
+      compiler->flow_graph().graph_entry()->entry_skipping_type_checks()) {
+    compiler->entry_point_skipping_type_checks = __ CodeSize();
+  }
+
   // SAMIR_TODO: Make the treatment of the alternate entry-point and the default
   // entry-point more uniform so that edge-counters can determine the which
   // entry-point's prologue comes first.
   if (this ==
-      compiler->flow_graph().graph_entry()->entry_skipping_type_checks()) {
+          compiler->flow_graph().graph_entry()->entry_skipping_type_checks() ||
+      this == compiler->flow_graph().graph_entry()->normal_entry()) {
     compiler->entry_point_skipping_type_checks = __ CodeSize();
     compiler->EmitPrologue();
   }
