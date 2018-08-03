@@ -980,6 +980,9 @@ Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
       target_type = &AbstractType::ZoneHandle(
           Z, forwarding_target->ParameterTypeAt(kFirstParameterOffset + i));
     }
+
+    if (target_type->IsTopType()) continue;
+
     body += LoadLocal(param);
     body += CheckArgumentType(param, *target_type);
     body += Drop();
@@ -1003,6 +1006,9 @@ Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
       target_type = &AbstractType::ZoneHandle(
           Z, forwarding_target->ParameterTypeAt(num_positional_params + i + 1));
     }
+
+    if (target_type->IsTopType()) continue;
+
     body += LoadLocal(param);
     body += CheckArgumentType(param, *target_type);
     body += Drop();
@@ -1506,11 +1512,34 @@ Fragment StreamingFlowGraphBuilder::BuildFirstTimePrologue(
   Fragment F;
   F += SetupCapturedParameters(dart_function);
   F += ShortcutForUserDefinedEquals(dart_function, first_parameter);
-  F += CheckArgumentTypesAsNecessary(dart_function, type_parameters_offset);
   return F;
 }
 
-FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(bool constructor) {
+TargetEntryInstr* StreamingFlowGraphBuilder::BuildExtraEntryPoint(
+    TargetEntryInstr* normal_entry,
+    Fragment normal_prologue,
+    Fragment extra_prologue,
+    Fragment type_checks,
+    Fragment body) {
+  auto* join_entry = BuildJoinEntry();
+
+  Fragment normal(normal_entry);
+  normal += normal_prologue;
+  normal += type_checks;
+  normal += Goto(join_entry);
+
+  auto extra_entry = B->BuildTargetEntry();
+
+  Fragment extra(extra_entry);
+  extra += extra_prologue;
+  extra += Goto(join_entry);
+
+  join_entry->LinkTo(body.entry);
+  return extra_entry;
+}
+
+FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
+    bool is_constructor) {
   // The prologue builder needs the default parameter values.
   SetupDefaultParameterValues();
 
@@ -1543,6 +1572,11 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(bool constructor) {
       new (Z) GraphEntryInstr(*parsed_function(), normal_entry,
                               flow_graph_builder_->osr_id_);
 
+  auto extra_entry_point_style =
+      dart_function.MayHaveEntryPointSkippingTypeChecks(I)
+          ? ExtraEntryPointStyle::kSeparate
+          : ExtraEntryPointStyle::kNone;
+
   // The 'every_time_prologue' runs first and is run when resuming from yield
   // points.
   const Fragment every_time_prologue = BuildEveryTimePrologue(
@@ -1553,18 +1587,64 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(bool constructor) {
   const Fragment first_time_prologue = BuildFirstTimePrologue(
       dart_function, first_parameter, type_parameters_offset);
 
+  const Fragment type_checks =
+      CheckArgumentTypesAsNecessary(dart_function, type_parameters_offset);
+
+  if (type_checks.is_empty()) {
+    extra_entry_point_style = ExtraEntryPointStyle::kNone;
+  }
+
   const Fragment body =
-      BuildFunctionBody(dart_function, first_parameter, constructor);
+      BuildFunctionBody(dart_function, first_parameter, is_constructor);
 
-  // If the function's body contains any yield points, build switch statement
-  // that selects a continuation point based on the value of :await_jump_var.
-  const Fragment function =
-      yield_continuations().is_empty()
-          ? every_time_prologue + first_time_prologue + body
-          : every_time_prologue +
+  if (extra_entry_point_style == ExtraEntryPointStyle::kSeparate &&
+      (!prologue_info.IsEmpty() || !first_time_prologue.is_empty() ||
+       !(every_time_prologue.entry == every_time_prologue.current ||
+         every_time_prologue.current->previous() ==
+             every_time_prologue.entry))) {
+    extra_entry_point_style = ExtraEntryPointStyle::kSharedWithVariable;
+  }
+
+  Fragment function(instruction_cursor);
+  if (yield_continuations().is_empty()) {
+    TargetEntryInstr* extra_entry = nullptr;
+    switch (extra_entry_point_style) {
+      case ExtraEntryPointStyle::kNone: {
+        function +=
+            every_time_prologue + first_time_prologue + type_checks + body;
+        break;
+      }
+      case ExtraEntryPointStyle::kSeparate: {
+        ASSERT(instruction_cursor == normal_entry);
+        ASSERT(first_time_prologue.is_empty());
+
+        const Fragment prologue_copy = BuildEveryTimePrologue(
+            dart_function, token_position, type_parameters_offset);
+
+        extra_entry = BuildExtraEntryPoint(normal_entry, every_time_prologue,
+                                           prologue_copy, type_checks, body);
+        break;
+      }
+      case ExtraEntryPointStyle::kSharedWithVariable: {
+        // SAMIR_TODO: Use a temporary variable to skip checks without
+        // increasing code size.
+        function +=
+            every_time_prologue + first_time_prologue + type_checks + body;
+        break;
+      }
+    }
+    // SAMIR_TODO: Use the extra entry point when inlining if the call-site
+    // allows.
+    if (!B->IsInlining()) {
+      graph_entry->set_entry_skipping_type_checks(extra_entry);
+    }
+  } else {
+    // If the function's body contains any yield points, build switch statement
+    // that selects a continuation point based on the value of :await_jump_var.
+    ASSERT(type_checks.is_empty());
+    function += every_time_prologue +
                 CompleteBodyWithYieldContinuations(first_time_prologue + body);
-
-  instruction_cursor->LinkTo(function.entry);
+  }
 
   // When compiling for OSR, use a depth first search to find the OSR
   // entry and make graph entry jump to it instead of normal entry.

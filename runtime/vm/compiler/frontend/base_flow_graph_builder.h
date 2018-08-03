@@ -35,8 +35,10 @@ class Fragment {
   Fragment(Instruction* entry, Instruction* current)
       : entry(entry), current(current) {}
 
-  bool is_open() { return entry == nullptr || current != nullptr; }
-  bool is_closed() { return !is_open(); }
+  bool is_open() const { return entry == nullptr || current != nullptr; }
+  bool is_closed() const { return !is_open(); }
+
+  bool is_empty() const { return entry == nullptr && current == nullptr; }
 
   void Prepend(Instruction* start);
 

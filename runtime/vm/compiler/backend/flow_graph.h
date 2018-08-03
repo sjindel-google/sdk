@@ -88,6 +88,10 @@ struct PrologueInfo {
   bool Contains(intptr_t block_id) const {
     return min_block_id <= block_id && block_id <= max_block_id;
   }
+
+  bool IsEmpty() const {
+    return min_block_id == -1 && max_block_id == -1;
+  }
 };
 
 // Class to encapsulate the construction and manipulation of the flow graph.
