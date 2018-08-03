@@ -21,13 +21,6 @@ namespace kernel {
 
 #define Z (zone_)
 
-// SAMIR_TODO: account for inlining and osr
-bool PrologueBuilder::NeedsPrologue(Isolate* isolate, const Function& function) {
-  return function.HasOptionalParameters() ||
-         (function.IsGeneric() && isolate->reify_generic_functions()) ||
-         function.IsClosureFunction();
-}
-
 BlockEntryInstr* PrologueBuilder::BuildPrologue(BlockEntryInstr* entry,
                                                 PrologueInfo* prologue_info) {
   Isolate* isolate = Isolate::Current();
@@ -69,7 +62,6 @@ BlockEntryInstr* PrologueBuilder::BuildPrologue(BlockEntryInstr* entry,
   }
 
   const bool is_empty_prologue = prologue.entry == prologue.current;
-  ASSERT(NeedsPrologue(isolate, function_) || is_empty_prologue);
 
   // Always do this to preserve deoptid numbering.
   JoinEntryInstr* normal_code = BuildJoinEntry();

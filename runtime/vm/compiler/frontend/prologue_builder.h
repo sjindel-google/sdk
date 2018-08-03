@@ -44,8 +44,6 @@ class PrologueBuilder : public BaseFlowGraphBuilder {
         compiling_for_osr_(compiling_for_osr),
         is_inlining_(is_inlining) {}
 
-  static bool NeedsPrologue(Isolate* isolate, const Function& function);
-
   BlockEntryInstr* BuildPrologue(BlockEntryInstr* entry,
                                  PrologueInfo* prologue_info);
 
