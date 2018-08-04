@@ -4118,6 +4118,11 @@ LocationSummary* StaticCallInstr::MakeLocationSummary(Zone* zone,
 }
 
 void StaticCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
+  if (strstr(compiler->function().ToFullyQualifiedCString(), "HashMap") &&
+      strstr(compiler->function().ToFullyQualifiedCString(), "[]=") &&
+      strstr(function().ToCString(), "_addEntry")) {
+    // __ Breakpoint();
+  }
   Zone* zone = compiler->zone();
   const ICData* call_ic_data = NULL;
   if (!FLAG_propagate_ic_data || !compiler->is_optimizing() ||
@@ -4146,7 +4151,8 @@ void StaticCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
 #if !defined(TARGET_ARCH_DBC)
   ArgumentsInfo args_info(type_args_len(), ArgumentCount(), argument_names());
   compiler->GenerateStaticCall(deopt_id(), token_pos(), function(), args_info,
-                               locs(), *call_ic_data, rebind_rule_);
+                               locs(), *call_ic_data, rebind_rule_,
+                               can_skip_callee_type_checks());
   if (function().IsFactory()) {
     TypeUsageInfo* type_usage_info = compiler->thread()->type_usage_info();
     if (type_usage_info != nullptr) {

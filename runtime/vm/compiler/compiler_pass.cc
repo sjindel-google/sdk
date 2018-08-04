@@ -258,6 +258,7 @@ void CompilerPass::RunPipeline(PipelineMode mode,
   }
 #endif
   INVOKE_PASS(WriteBarrierElimination);
+  INVOKE_PASS(OptimizeTypeCheckedCalls);
   INVOKE_PASS(FinalizeGraph);
   INVOKE_PASS(AllocateRegisters);
   if (mode == kJIT) {
@@ -429,6 +430,35 @@ static void WriteBarrierElimination(FlowGraph* flow_graph) {
 
 COMPILER_PASS(WriteBarrierElimination,
               { WriteBarrierElimination(flow_graph); });
+
+static void OptimizeTypeCheckedCalls(FlowGraph* flow_graph) {
+  if (flow_graph->function().is_static() ||
+      flow_graph->function().kind() != RawFunction::kRegularFunction) {
+    return;
+  }
+  for (BlockIterator block_it = flow_graph->reverse_postorder_iterator();
+       !block_it.Done(); block_it.Advance()) {
+    BlockEntryInstr* block = block_it.Current();
+    for (ForwardInstructionIterator it(block); !it.Done(); it.Advance()) {
+      Instruction* current = it.Current();
+      if (StaticCallInstr* instr = current->AsStaticCall()) {
+        if (instr->FirstArgIndex() < instr->ArgumentCount()) {
+          Value* receiver = instr->Receiver();
+          if (flow_graph->IsReceiver(receiver->definition())) {
+            auto& target = instr->function();
+            if (!target.is_static() &&
+                target.kind() == RawFunction::kRegularFunction) {
+              instr->set_can_skip_callee_type_checks(true);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+COMPILER_PASS(OptimizeTypeCheckedCalls,
+              { OptimizeTypeCheckedCalls(flow_graph); });
 
 COMPILER_PASS(FinalizeGraph, {
   // Compute and store graph informations (call & instruction counts)

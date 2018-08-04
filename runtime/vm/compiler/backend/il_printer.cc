@@ -560,6 +560,9 @@ void StaticCallInstr::PrintOperandsTo(BufferFormatter* f) const {
     if (i > 0) f->Print(", ");
     PushArgumentAt(i)->value()->PrintTo(f);
   }
+  if (can_skip_callee_type_checks()) {
+    f->Print(", skipping callee type checks");
+  }
 }
 
 void LoadLocalInstr::PrintOperandsTo(BufferFormatter* f) const {

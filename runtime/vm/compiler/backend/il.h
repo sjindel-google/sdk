@@ -3755,6 +3755,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
         rebind_rule_(rebind_rule),
         result_type_(NULL),
         is_known_list_constructor_(false),
+        can_skip_callee_type_checks_(false),
         identity_(AliasIdentity::Unknown()) {
     ic_data_ = GetICData(ic_data_array);
     ASSERT(function.IsZoneHandle());
@@ -3780,6 +3781,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
         rebind_rule_(rebind_rule),
         result_type_(NULL),
         is_known_list_constructor_(false),
+        can_skip_callee_type_checks_(false),
         identity_(AliasIdentity::Unknown()) {
     ASSERT(function.IsZoneHandle());
     ASSERT(!function.IsNull());
@@ -3851,6 +3853,14 @@ class StaticCallInstr : public TemplateDartCall<0> {
     is_known_list_constructor_ = value;
   }
 
+  bool can_skip_callee_type_checks() const {
+    return can_skip_callee_type_checks_;
+  }
+
+  void set_can_skip_callee_type_checks(bool value) {
+    can_skip_callee_type_checks_ = value;
+  }
+
   bool IsRecognizedFactory() const { return is_known_list_constructor(); }
 
   virtual AliasIdentity Identity() const { return identity_; }
@@ -3867,6 +3877,8 @@ class StaticCallInstr : public TemplateDartCall<0> {
 
   // 'True' for recognized list constructors.
   bool is_known_list_constructor_;
+
+  bool can_skip_callee_type_checks_;
 
   AliasIdentity identity_;
 

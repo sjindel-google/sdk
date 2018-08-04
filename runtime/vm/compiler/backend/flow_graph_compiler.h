@@ -461,7 +461,8 @@ class FlowGraphCompiler : public ValueObject {
                               const StubEntry& stub_entry,
                               RawPcDescriptors::Kind kind,
                               LocationSummary* locs,
-                              const Function& target);
+                              const Function& target,
+                              bool can_skip_callee_type_checks = false);
 
   void GenerateInstanceOf(TokenPosition token_pos,
                           intptr_t deopt_id,
@@ -479,7 +480,8 @@ class FlowGraphCompiler : public ValueObject {
                           ArgumentsInfo args_info,
                           LocationSummary* locs,
                           const ICData& ic_data_in,
-                          ICData::RebindRule rebind_rule);
+                          ICData::RebindRule rebind_rule,
+                          bool can_skip_callee_type_checks = false);
 
   void GenerateNumberTypeCheck(Register kClassIdReg,
                                const AbstractType& type,
@@ -765,7 +767,8 @@ class FlowGraphCompiler : public ValueObject {
                                intptr_t count_with_type_args,
                                intptr_t deopt_id,
                                TokenPosition token_pos,
-                               LocationSummary* locs);
+                               LocationSummary* locs,
+                               bool can_skip_callee_type_checks = true);
 
   void EmitUnoptimizedStaticCall(intptr_t count_with_type_args,
                                  intptr_t deopt_id,

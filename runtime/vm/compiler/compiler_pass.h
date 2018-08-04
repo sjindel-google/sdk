@@ -43,7 +43,8 @@ namespace dart {
   V(TryOptimizePatterns)                                                       \
   V(TypePropagation)                                                           \
   V(WidenSmiToInt32)                                                           \
-  V(WriteBarrierElimination)
+  V(WriteBarrierElimination)                                                   \
+  V(OptimizeTypeCheckedCalls)
 
 class AllocationSinking;
 class BlockScheduler;

@@ -1257,13 +1257,14 @@ class RawCode : public RawObject {
 
   uword entry_point_;          // Accessed from generated code.
   uword checked_entry_point_;  // Accessed from generated code (AOT only).
+  uword entry_point_skipping_type_checks_;  // Accessed from generated code.
 
   VISIT_FROM(RawObject*, object_pool_);
   RawObjectPool* object_pool_;     // Accessed from generated code.
-  RawInstructions* instructions_;  // Accessed from generated code.
   // If owner_ is Function::null() the owner is a regular stub.
   // If owner_ is a Class the owner is the allocation stub for that class.
   // Else, owner_ is a regular Dart Function.
+  RawInstructions* instructions_;  // Accessed from generated code.
   RawObject* owner_;  // Function, Null, or a Class.
   RawExceptionHandlers* exception_handlers_;
   RawPcDescriptors* pc_descriptors_;
@@ -1299,7 +1300,6 @@ class RawCode : public RawObject {
   // Alive: If true, the embedded object pointers will be visited during GC.
   int32_t state_bits_;
 
-  uword entry_point_skipping_type_checks_;  // Accessed from generated code (JIT only).
   uword entry_point_skipping_type_checks_pc_;
 
   // Variable length data follows here.

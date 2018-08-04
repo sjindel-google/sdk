@@ -915,6 +915,9 @@ void FlowGraphCompiler::EmitDeopt(intptr_t deopt_id,
 void FlowGraphCompiler::FinalizeEntryPoints(const Code& code) {
   code.set_entry_point_skipping_type_checks_pc(
       entry_point_skipping_type_checks);
+  code.set_entry_point_skipping_type_checks(
+      Instructions::Handle(code.instructions()).PayloadStart() +
+      entry_point_skipping_type_checks);
 }
 
 void FlowGraphCompiler::FinalizeExceptionHandlers(const Code& code) {
@@ -1204,7 +1207,8 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
                                            ArgumentsInfo args_info,
                                            LocationSummary* locs,
                                            const ICData& ic_data_in,
-                                           ICData::RebindRule rebind_rule) {
+                                           ICData::RebindRule rebind_rule,
+                                           bool can_skip_callee_type_checks) {
   const ICData& ic_data = ICData::ZoneHandle(ic_data_in.Original());
   const Array& arguments_descriptor = Array::ZoneHandle(
       zone(), ic_data.IsNull() ? args_info.ToArgumentsDescriptor()
@@ -1214,7 +1218,7 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
   if (is_optimizing()) {
     EmitOptimizedStaticCall(function, arguments_descriptor,
                             args_info.count_with_type_args, deopt_id, token_pos,
-                            locs);
+                            locs, can_skip_callee_type_checks);
   } else {
     ICData& call_ic_data = ICData::ZoneHandle(zone(), ic_data.raw());
     if (call_ic_data.IsNull()) {
