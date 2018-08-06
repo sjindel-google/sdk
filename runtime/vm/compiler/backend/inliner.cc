@@ -17,6 +17,7 @@
 #include "vm/compiler/frontend/kernel_to_il.h"
 #include "vm/compiler/jit/compiler.h"
 #include "vm/compiler/jit/jit_call_specializer.h"
+#include "vm/compiler/compiler_pass.h"
 #include "vm/flags.h"
 #include "vm/kernel.h"
 #include "vm/longjump.h"
@@ -1107,6 +1108,11 @@ class CallSiteInliner : public ValueObject {
             // before 'SelectRepresentations' which inserts conversion nodes.
             callee_graph->TryOptimizePatterns();
             DEBUG_ASSERT(callee_graph->VerifyUseLists());
+
+            // This optimization must be performed before inlining to ensure
+            // that the receiver of the function is detected (since it will just
+            // be some regular variable after inlining).
+            OptimizeTypeCheckedCalls(callee_graph);
 
             callee_graph->Canonicalize();
           }

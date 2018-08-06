@@ -170,6 +170,8 @@ class CompilerPass {
   intptr_t flags_;
 };
 
+void OptimizeTypeCheckedCalls(FlowGraph* flow_graph);
+
 }  // namespace dart
 
 #endif

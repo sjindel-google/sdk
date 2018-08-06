@@ -431,7 +431,7 @@ static void WriteBarrierElimination(FlowGraph* flow_graph) {
 COMPILER_PASS(WriteBarrierElimination,
               { WriteBarrierElimination(flow_graph); });
 
-static void OptimizeTypeCheckedCalls(FlowGraph* flow_graph) {
+void OptimizeTypeCheckedCalls(FlowGraph* flow_graph) {
   if (flow_graph->function().is_static() ||
       flow_graph->function().kind() != RawFunction::kRegularFunction) {
     return;
