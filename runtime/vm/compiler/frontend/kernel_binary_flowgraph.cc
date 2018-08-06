@@ -513,7 +513,7 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
       // Tearoffs of static methods needs to perform arguments checks since
       // static methods they forward to don't do it themselves.
       AlternativeReadingScope _(&reader_);
-      body += BuildArgumentTypeChecks(kCheckAllTypeParameterBounds);
+      BuildArgumentTypeChecks(kCheckAllTypeParameterBounds, &body, &body);
     } else {
       // Check if parent function was annotated with no-dynamic-invocations.
       const ProcedureAttributesMetadata attrs =
@@ -523,7 +523,8 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
         // If it was then we might need to build some checks in the
         // tear-off.
         AlternativeReadingScope _(&reader_);
-        body += BuildArgumentTypeChecks(kCheckNonCovariantTypeParameterBounds);
+        BuildArgumentTypeChecks(kCheckNonCovariantTypeParameterBounds, &body,
+                                &body);
       }
     }
   }
@@ -630,7 +631,7 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfNoSuchMethodForwarder(
 
   if (function.NeedsArgumentTypeChecks(I)) {
     AlternativeReadingScope _(&reader_);
-    body += BuildArgumentTypeChecks(kCheckAllTypeParameterBounds);
+    BuildArgumentTypeChecks(kCheckAllTypeParameterBounds, &body, &body);
   }
 
   function_node_helper.ReadUntilExcluding(
@@ -876,17 +877,15 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfNoSuchMethodForwarder(
                            B->last_used_block_id_, prologue_info);
 }
 
-Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
-    TypeChecksToBuild mode) {
-  if (FLAG_omit_strong_type_checks) {
-    return Fragment();
-  }
+void StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
+    TypeChecksToBuild mode,
+    Fragment* explicit_checks,
+    Fragment* implicit_checks) {
+  if (FLAG_omit_strong_type_checks) return;
 
   FunctionNodeHelper function_node_helper(this);
   function_node_helper.SetNext(FunctionNodeHelper::kTypeParameters);
   const Function& dart_function = parsed_function()->function();
-
-  Fragment body;
 
   const Function* forwarding_target = NULL;
   if (parsed_function()->is_forwarding_stub()) {
@@ -954,7 +953,7 @@ Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
       param ^= TypeArguments::Handle(dart_function.type_parameters()).TypeAt(i);
     }
     ASSERT(param.IsFinalized());
-    body += CheckTypeArgumentBound(param, bound, name);
+    *implicit_checks += CheckTypeArgumentBound(param, bound, name);
   }
 
   function_node_helper.SetJustRead(FunctionNodeHelper::kTypeParameters);
@@ -967,7 +966,8 @@ Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
   for (intptr_t i = 0; i < num_positional_params; ++i) {
     // ith variable offset.
     const intptr_t offset = ReaderOffset();
-    SkipVariableDeclaration();
+    VariableDeclarationHelper helper(this);
+    helper.ReadUntilExcluding(VariableDeclarationHelper::kEnd);
 
     LocalVariable* param = LookupVariable(offset + data_program_offset_);
     if (!param->needs_type_check()) {
@@ -983,9 +983,11 @@ Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
 
     if (target_type->IsTopType()) continue;
 
-    body += LoadLocal(param);
-    body += CheckArgumentType(param, *target_type);
-    body += Drop();
+    Fragment* F = helper.IsCovariant() ? explicit_checks : implicit_checks;
+
+    *F += LoadLocal(param);
+    *F += CheckArgumentType(param, *target_type);
+    *F += Drop();
   }
 
   // Named.
@@ -993,7 +995,8 @@ Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
   for (intptr_t i = 0; i < num_named_params; ++i) {
     // ith variable offset.
     const intptr_t offset = ReaderOffset();
-    SkipVariableDeclaration();
+    VariableDeclarationHelper helper(this);
+    helper.ReadUntilExcluding(VariableDeclarationHelper::kEnd);
 
     LocalVariable* param = LookupVariable(offset + data_program_offset_);
     if (!param->needs_type_check()) {
@@ -1009,12 +1012,12 @@ Fragment StreamingFlowGraphBuilder::BuildArgumentTypeChecks(
 
     if (target_type->IsTopType()) continue;
 
-    body += LoadLocal(param);
-    body += CheckArgumentType(param, *target_type);
-    body += Drop();
-  }
+    Fragment* F = helper.IsCovariant() ? explicit_checks : implicit_checks;
 
-  return body;
+    *F += LoadLocal(param);
+    *F += CheckArgumentType(param, *target_type);
+    *F += Drop();
+  }
 }
 
 Fragment StreamingFlowGraphBuilder::PushAllArguments(PushedArguments* pushed) {
@@ -1135,7 +1138,8 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfDynamicInvocationForwarder() {
   {
     AlternativeReadingScope alt(&reader_);
     SetOffset(type_parameters_offset);
-    body += BuildArgumentTypeChecks(kCheckNonCovariantTypeParameterBounds);
+    BuildArgumentTypeChecks(kCheckNonCovariantTypeParameterBounds, &body,
+                            &body);
   }
 
   // Push all arguments and invoke the original method.
@@ -1405,10 +1409,12 @@ Fragment StreamingFlowGraphBuilder::SetupCapturedParameters(
 
 // If we run in checked mode or strong mode, we have to check the type of the
 // passed arguments.
-Fragment StreamingFlowGraphBuilder::CheckArgumentTypesAsNecessary(
+void StreamingFlowGraphBuilder::CheckArgumentTypesAsNecessary(
     const Function& dart_function,
-    intptr_t type_parameters_offset) {
-  if (!dart_function.NeedsArgumentTypeChecks(I)) return {};
+    intptr_t type_parameters_offset,
+    Fragment* explicit_checks,
+    Fragment* implicit_checks) {
+  if (!dart_function.NeedsArgumentTypeChecks(I)) return;
 
   // Check if parent function was annotated with no-dynamic-invocations.
   const ProcedureAttributesMetadata attrs =
@@ -1417,10 +1423,11 @@ Fragment StreamingFlowGraphBuilder::CheckArgumentTypesAsNecessary(
 
   AlternativeReadingScope _(&reader_);
   SetOffset(type_parameters_offset);
-  return BuildArgumentTypeChecks(
+  BuildArgumentTypeChecks(
       MethodCanSkipTypeChecksForNonCovariantArguments(dart_function, attrs)
           ? kCheckCovariantTypeParameterBounds
-          : kCheckAllTypeParameterBounds);
+          : kCheckAllTypeParameterBounds,
+      explicit_checks, implicit_checks);
 }
 
 Fragment StreamingFlowGraphBuilder::ShortcutForUserDefinedEquals(
@@ -1519,13 +1526,14 @@ TargetEntryInstr* StreamingFlowGraphBuilder::BuildExtraEntryPoint(
     TargetEntryInstr* normal_entry,
     Fragment normal_prologue,
     Fragment extra_prologue,
-    Fragment type_checks,
+    Fragment explicit_checks,
+    Fragment implicit_checks,
     Fragment body) {
   auto* join_entry = BuildJoinEntry();
 
   Fragment normal(normal_entry);
   normal += normal_prologue;
-  normal += type_checks;
+  normal += implicit_checks;
   normal += Goto(join_entry);
 
   auto extra_entry = B->BuildTargetEntry();
@@ -1534,7 +1542,10 @@ TargetEntryInstr* StreamingFlowGraphBuilder::BuildExtraEntryPoint(
   extra += extra_prologue;
   extra += Goto(join_entry);
 
-  Fragment(join_entry) <<= body.entry;
+  Fragment join(join_entry);
+  join += explicit_checks;
+  join += body;
+
   return extra_entry;
 }
 
@@ -1587,10 +1598,12 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
   const Fragment first_time_prologue = BuildFirstTimePrologue(
       dart_function, first_parameter, type_parameters_offset);
 
-  const Fragment type_checks =
-      CheckArgumentTypesAsNecessary(dart_function, type_parameters_offset);
+  Fragment explicit_type_checks;
+  Fragment implicit_type_checks;
+  CheckArgumentTypesAsNecessary(dart_function, type_parameters_offset,
+                                &explicit_type_checks, &implicit_type_checks);
 
-  if (type_checks.is_empty()) {
+  if (implicit_type_checks.is_empty()) {
     extra_entry_point_style = ExtraEntryPointStyle::kNone;
   }
 
@@ -1610,8 +1623,8 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
     TargetEntryInstr* extra_entry = nullptr;
     switch (extra_entry_point_style) {
       case ExtraEntryPointStyle::kNone: {
-        function +=
-            every_time_prologue + first_time_prologue + type_checks + body;
+        function += every_time_prologue + first_time_prologue +
+                    implicit_type_checks + explicit_type_checks + body;
         break;
       }
       case ExtraEntryPointStyle::kSeparate: {
@@ -1622,14 +1635,15 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
             dart_function, token_position, type_parameters_offset);
 
         extra_entry = BuildExtraEntryPoint(normal_entry, every_time_prologue,
-                                           prologue_copy, type_checks, body);
+                                           prologue_copy, explicit_type_checks,
+                                           implicit_type_checks, body);
         break;
       }
       case ExtraEntryPointStyle::kSharedWithVariable: {
         // SAMIR_TODO: Use a temporary variable to skip checks without
         // increasing code size.
-        function +=
-            every_time_prologue + first_time_prologue + type_checks + body;
+        function += every_time_prologue + first_time_prologue +
+                    implicit_type_checks + explicit_type_checks + body;
         break;
       }
     }
@@ -1643,7 +1657,7 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
   } else {
     // If the function's body contains any yield points, build switch statement
     // that selects a continuation point based on the value of :await_jump_var.
-    ASSERT(type_checks.is_empty());
+    ASSERT(implicit_type_checks.is_empty() && explicit_type_checks.is_empty());
     function += every_time_prologue +
                 CompleteBodyWithYieldContinuations(first_time_prologue + body);
   }

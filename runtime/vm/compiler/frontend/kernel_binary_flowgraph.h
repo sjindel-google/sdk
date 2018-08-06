@@ -103,13 +103,16 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
                                         LocalVariable* first_parameter);
   Fragment TypeArgumentsHandling(const Function& dart_function,
                                  intptr_t type_parameters_offset);
-  Fragment CheckArgumentTypesAsNecessary(const Function& dart_function,
-                                         intptr_t type_parameters_offset);
+  void CheckArgumentTypesAsNecessary(const Function& dart_function,
+                                     intptr_t type_parameters_offset,
+                                     Fragment* explicit_checks,
+                                     Fragment* implicit_checks);
   Fragment CompleteBodyWithYieldContinuations(Fragment body);
   TargetEntryInstr* BuildExtraEntryPoint(TargetEntryInstr* normal_entry,
                                          Fragment normal_prologue,
                                          Fragment extra_prologue,
-                                         Fragment type_checks,
+                                         Fragment explicit_type_checks,
+                                         Fragment implicit_type_checks,
                                          Fragment body);
 
   void loop_depth_inc();
@@ -213,7 +216,9 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   };
   Fragment PushAllArguments(PushedArguments* pushed);
 
-  Fragment BuildArgumentTypeChecks(TypeChecksToBuild mode);
+  void BuildArgumentTypeChecks(TypeChecksToBuild mode,
+                               Fragment* explicit_checks,
+                               Fragment* implicit_checks);
 
   Fragment ThrowException(TokenPosition position);
   Fragment BooleanNegate();
