@@ -1149,7 +1149,8 @@ void FlowGraphCompiler::GenerateCallWithDeopt(TokenPosition token_pos,
 void FlowGraphCompiler::GenerateInstanceCall(intptr_t deopt_id,
                                              TokenPosition token_pos,
                                              LocationSummary* locs,
-                                             const ICData& ic_data_in) {
+                                             const ICData& ic_data_in,
+                                             bool can_skip_callee_type_checks) {
   ICData& ic_data = ICData::ZoneHandle(ic_data_in.Original());
   if (FLAG_precompiled_mode) {
     ic_data = ic_data.AsUnaryClassChecks();
@@ -1293,11 +1294,12 @@ void FlowGraphCompiler::EmitComment(Instruction* instr) {
 bool FlowGraphCompiler::NeedsEdgeCounter(TargetEntryInstr* block) {
   // Only emit an edge counter if there is not goto at the end of the block,
   // except for the entry block.
-  return (FLAG_reorder_basic_blocks &&
-          (!block->last_instruction()->IsGoto() ||
-           (block == flow_graph().graph_entry()->normal_entry()) ||
-           // SAMIR_TODO: do we need this?
-           (block == flow_graph().graph_entry()->entry_skipping_type_checks())));
+  return (
+      FLAG_reorder_basic_blocks &&
+      (!block->last_instruction()->IsGoto() ||
+       (block == flow_graph().graph_entry()->normal_entry()) ||
+       // SAMIR_TODO: do we need this?
+       (block == flow_graph().graph_entry()->entry_skipping_type_checks())));
 }
 
 // Allocate a register that is not explictly blocked.
@@ -1804,7 +1806,8 @@ void FlowGraphCompiler::EmitPolymorphicInstanceCall(
     EmitTestAndCall(targets, original_call.function_name(), args_info,
                     deopt,  // No cid match.
                     &ok,    // Found cid.
-                    deopt_id, token_pos, locs, complete, total_ic_calls);
+                    deopt_id, token_pos, locs, complete, total_ic_calls,
+                    original_call.can_skip_callee_type_checks());
     assembler()->Bind(&ok);
   } else {
     if (complete) {
@@ -1832,7 +1835,8 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
                                         TokenPosition token_index,
                                         LocationSummary* locs,
                                         bool complete,
-                                        intptr_t total_ic_calls) {
+                                        intptr_t total_ic_calls,
+                                        bool can_skip_callee_type_checks) {
   ASSERT(is_optimizing());
 
   const Array& arguments_descriptor =
@@ -1874,9 +1878,9 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
     // Do not use the code from the function, but let the code be patched so
     // that we can record the outgoing edges to other code.
     const Function& function = *targets.TargetAt(smi_case)->target;
-    GenerateStaticDartCall(deopt_id, token_index,
-                           *StubCode::CallStaticFunction_entry(),
-                           RawPcDescriptors::kOther, locs, function);
+    GenerateStaticDartCall(
+        deopt_id, token_index, *StubCode::CallStaticFunction_entry(),
+        RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
     __ Drop(args_info.count_with_type_args);
     if (match_found != NULL) {
       __ Jump(match_found);
@@ -1925,9 +1929,9 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
     // Do not use the code from the function, but let the code be patched so
     // that we can record the outgoing edges to other code.
     const Function& function = *targets.TargetAt(i)->target;
-    GenerateStaticDartCall(deopt_id, token_index,
-                           *StubCode::CallStaticFunction_entry(),
-                           RawPcDescriptors::kOther, locs, function);
+    GenerateStaticDartCall(
+        deopt_id, token_index, *StubCode::CallStaticFunction_entry(),
+        RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
     __ Drop(args_info.count_with_type_args);
     if (!is_last_check || add_megamorphic_call) {
       __ Jump(match_found);

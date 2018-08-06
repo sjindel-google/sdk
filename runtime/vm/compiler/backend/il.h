@@ -3355,6 +3355,14 @@ class InstanceCallInstr : public TemplateDartCall<0> {
 
   RawFunction* ResolveForReceiverClass(const Class& cls, bool allow_add = true);
 
+  bool can_skip_callee_type_checks() const {
+    return can_skip_callee_type_checks_;
+  }
+
+  void set_can_skip_callee_type_checks(bool value) {
+    can_skip_callee_type_checks_ = value;
+  }
+
  protected:
   friend class CallSpecializer;
   void set_ic_data(ICData* value) { ic_data_ = value; }
@@ -3367,6 +3375,7 @@ class InstanceCallInstr : public TemplateDartCall<0> {
   const Function& interface_target_;
   CompileType* result_type_;  // Inferred result type.
   bool has_unique_selector_;
+  bool can_skip_callee_type_checks_ = false;
 
   DISALLOW_COPY_AND_ASSIGN(InstanceCallInstr);
 };

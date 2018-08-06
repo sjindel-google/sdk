@@ -935,8 +935,9 @@ void FlowGraphCompiler::GenerateDartCall(intptr_t deopt_id,
                                          TokenPosition token_pos,
                                          const StubEntry& stub_entry,
                                          RawPcDescriptors::Kind kind,
-                                         LocationSummary* locs) {
-  __ CallPatchable(stub_entry);
+                                         LocationSummary* locs,
+                                         bool can_skip_callee_type_checks) {
+  __ CallPatchable(stub_entry, can_skip_callee_type_checks);
   EmitCallsiteMetadata(token_pos, deopt_id, kind, locs);
 }
 
@@ -995,7 +996,8 @@ void FlowGraphCompiler::EmitOptimizedInstanceCall(const StubEntry& stub_entry,
                                                   const ICData& ic_data,
                                                   intptr_t deopt_id,
                                                   TokenPosition token_pos,
-                                                  LocationSummary* locs) {
+                                                  LocationSummary* locs,
+                                                  bool can_skip_callee_type_checks) {
   ASSERT(Array::Handle(zone(), ic_data.arguments_descriptor()).Length() > 0);
   // Each ICData propagated from unoptimized to optimized code contains the
   // function that corresponds to the Dart function of that IC call. Due

@@ -61,14 +61,16 @@ void Assembler::call(const ExternalLabel* label) {
   call(TMP);
 }
 
-void Assembler::CallPatchable(const StubEntry& stub_entry) {
+void Assembler::CallPatchable(const StubEntry& stub_entry,
+                              bool can_skip_callee_type_checks) {
   ASSERT(constant_pool_allowed());
   const Code& target = Code::ZoneHandle(stub_entry.code());
   intptr_t call_start = buffer_.GetPosition();
   const intptr_t idx = object_pool_wrapper_.AddObject(target, kPatchable);
   const int32_t offset = ObjectPool::element_offset(idx);
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag);
-  movq(TMP, FieldAddress(CODE_REG, Code::entry_point_offset()));
+  movq(TMP,
+       FieldAddress(CODE_REG, Code::entry_point_skipping_type_checks_offset()));
   call(TMP);
   ASSERT((buffer_.GetPosition() - call_start) == kCallExternalLabelSize);
 }

@@ -692,7 +692,8 @@ class Assembler : public ValueObject {
   void JmpPatchable(const StubEntry& stub_entry, Register pp);
   void Jmp(const StubEntry& stub_entry, Register pp = PP);
   void J(Condition condition, const StubEntry& stub_entry, Register pp);
-  void CallPatchable(const StubEntry& stub_entry);
+  void CallPatchable(const StubEntry& stub_entry,
+                     bool can_skip_callee_type_checks = false);
   void Call(const StubEntry& stub_entry);
   void CallToRuntime();
 

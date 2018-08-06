@@ -517,6 +517,9 @@ void PolymorphicInstanceCallInstr::PrintOperandsTo(BufferFormatter* f) const {
   if (complete()) {
     f->Print(" COMPLETE");
   }
+  if (instance_call()->can_skip_callee_type_checks()) {
+    f->Print(" skipping callee type checks");
+  }
 }
 
 void StrictCompareInstr::PrintOperandsTo(BufferFormatter* f) const {

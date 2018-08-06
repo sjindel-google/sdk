@@ -3866,11 +3866,13 @@ void InstanceCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
       const ICData& unary_ic_data =
           ICData::ZoneHandle(zone, ic_data()->AsUnaryClassChecks());
       compiler->GenerateInstanceCall(deopt_id(), token_pos(), locs(),
-                                     unary_ic_data);
+                                     unary_ic_data,
+                                     can_skip_callee_type_checks());
     } else {
       // Call was not visited yet, use original ICData in order to populate it.
       compiler->GenerateInstanceCall(deopt_id(), token_pos(), locs(),
-                                     *call_ic_data);
+                                     *call_ic_data,
+                                     can_skip_callee_type_checks());
     }
   } else {
     // Unoptimized code.

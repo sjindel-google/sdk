@@ -455,7 +455,9 @@ class FlowGraphCompiler : public ValueObject {
                         TokenPosition token_pos,
                         const StubEntry& stub_entry,
                         RawPcDescriptors::Kind kind,
-                        LocationSummary* locs);
+                        LocationSummary* locs,
+                        bool can_skip_callee_type_checks = false);
+
   void GenerateStaticDartCall(intptr_t deopt_id,
                               TokenPosition token_pos,
                               const StubEntry& stub_entry,
@@ -472,7 +474,8 @@ class FlowGraphCompiler : public ValueObject {
   void GenerateInstanceCall(intptr_t deopt_id,
                             TokenPosition token_pos,
                             LocationSummary* locs,
-                            const ICData& ic_data);
+                            const ICData& ic_data,
+                            bool can_skip_callee_type_checks = false);
 
   void GenerateStaticCall(intptr_t deopt_id,
                           TokenPosition token_pos,
@@ -518,7 +521,8 @@ class FlowGraphCompiler : public ValueObject {
                                  const ICData& ic_data,
                                  intptr_t deopt_id,
                                  TokenPosition token_pos,
-                                 LocationSummary* locs);
+                                 LocationSummary* locs,
+                                 bool can_skip_callee_type_checks = false);
 
   void EmitInstanceCall(const StubEntry& stub_entry,
                         const ICData& ic_data,
@@ -559,7 +563,8 @@ class FlowGraphCompiler : public ValueObject {
                        TokenPosition token_index,
                        LocationSummary* locs,
                        bool complete,
-                       intptr_t total_ic_calls);
+                       intptr_t total_ic_calls,
+                       bool can_skip_callee_type_checks = false);
 
   Condition EmitEqualityRegConstCompare(Register reg,
                                         const Object& obj,
