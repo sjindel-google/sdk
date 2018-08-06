@@ -15270,6 +15270,8 @@ void Code::DisableDartCode() const {
   const Code& new_code =
       Code::Handle(StubCode::FixCallersTarget_entry()->code());
   SetActiveInstructions(Instructions::Handle(new_code.instructions()));
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  raw_ptr()->entry_point_);
 }
 
 void Code::DisableStubCode() const {
@@ -15280,6 +15282,8 @@ void Code::DisableStubCode() const {
   const Code& new_code =
       Code::Handle(StubCode::FixAllocationStubTarget_entry()->code());
   SetActiveInstructions(Instructions::Handle(new_code.instructions()));
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  raw_ptr()->entry_point_);
 #else
   // DBC does not use allocation stubs.
   UNIMPLEMENTED();
