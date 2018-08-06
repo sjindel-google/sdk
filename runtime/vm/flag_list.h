@@ -209,6 +209,7 @@ constexpr bool kDartPrecompiledRuntime = false;
   P(enable_slow_path_sharing, bool, true, "Enable sharing of slow-path code.") \
   P(shared_slow_path_triggers_gc, bool, false,                                 \
     "TESTING: slow-path triggers a GC.")                                       \
-  P(enable_multiple_entrypoints, bool, true, "stuff")
+  P(enable_multiple_entrypoints, bool, true, "stuff") \
+  P(disable_checks_on_filter, charp, NULL, "testing stuff")
 
 #endif  // RUNTIME_VM_FLAG_LIST_H_

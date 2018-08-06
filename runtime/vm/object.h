@@ -2465,6 +2465,10 @@ class Function : public Object {
   bool IsInFactoryScope() const;
 
   bool NeedsArgumentTypeChecks(Isolate* I) const {
+    if (FLAG_disable_checks_on_filter &&
+        strstr(ToCString(), FLAG_disable_checks_on_filter)) {
+      return false;
+    }
     if (I->strong()) {
       if (FLAG_omit_strong_type_checks) {
         return false;
