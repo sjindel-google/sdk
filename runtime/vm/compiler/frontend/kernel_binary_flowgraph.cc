@@ -1534,7 +1534,7 @@ TargetEntryInstr* StreamingFlowGraphBuilder::BuildExtraEntryPoint(
   extra += extra_prologue;
   extra += Goto(join_entry);
 
-  join_entry->LinkTo(body.entry);
+  Fragment(join_entry) <<= body.entry;
   return extra_entry;
 }
 
@@ -1633,10 +1633,12 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
         break;
       }
     }
-    // SAMIR_TODO: Use the extra entry point when inlining if the call-site
-    // allows.
-    if (!B->IsInlining()) {
-      graph_entry->set_entry_skipping_type_checks(extra_entry);
+    if (FLAG_enable_multiple_entrypoints && extra_entry != nullptr) {
+      if (!B->IsInlining()) {
+        graph_entry->set_entry_skipping_type_checks(extra_entry);
+      } else if (B->SkippingTypeChecks()) {
+        graph_entry->set_normal_entry(extra_entry);
+      }
     }
   } else {
     // If the function's body contains any yield points, build switch statement
@@ -1645,6 +1647,7 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
     function += every_time_prologue +
                 CompleteBodyWithYieldContinuations(first_time_prologue + body);
   }
+
 
   // When compiling for OSR, use a depth first search to find the OSR
   // entry and make graph entry jump to it instead of normal entry.

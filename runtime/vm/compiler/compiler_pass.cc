@@ -219,6 +219,7 @@ void CompilerPass::RunPipeline(PipelineMode mode,
   INVOKE_PASS(SetOuterInliningId);
   INVOKE_PASS(TypePropagation);
   INVOKE_PASS(ApplyClassIds);
+  INVOKE_PASS(OptimizeTypeCheckedCalls);
   INVOKE_PASS(Inlining);
   INVOKE_PASS(TypePropagation);
   INVOKE_PASS(ApplyClassIds);
@@ -258,7 +259,6 @@ void CompilerPass::RunPipeline(PipelineMode mode,
   }
 #endif
   INVOKE_PASS(WriteBarrierElimination);
-  INVOKE_PASS(OptimizeTypeCheckedCalls);
   INVOKE_PASS(FinalizeGraph);
   INVOKE_PASS(AllocateRegisters);
   if (mode == kJIT) {

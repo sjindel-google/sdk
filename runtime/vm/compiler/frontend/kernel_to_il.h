@@ -50,7 +50,8 @@ class FlowGraphBuilder : public BaseFlowGraphBuilder {
                    InlineExitCollector* exit_collector,
                    bool optimizing,
                    intptr_t osr_id,
-                   intptr_t first_block_id = 1);
+                   intptr_t first_block_id = 1,
+                   bool skipping_type_checks = false);
   virtual ~FlowGraphBuilder();
 
   FlowGraph* BuildGraph();

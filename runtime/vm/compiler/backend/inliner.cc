@@ -961,11 +961,16 @@ class CallSiteInliner : public ValueObject {
             new (Z) InlineExitCollector(caller_graph_, call);
         FlowGraph* callee_graph;
         if (UseKernelFrontEndFor(parsed_function)) {
+          bool skipping_type_checks = false;
+          if (StaticCallInstr* instr = call_data->call->AsStaticCall()) {
+            skipping_type_checks = instr->can_skip_callee_type_checks();
+          }
           kernel::FlowGraphBuilder builder(
               parsed_function, *ic_data_array, /* not building var desc */ NULL,
               exit_collector,
               /* optimized = */ true, Compiler::kNoOSRDeoptId,
-              caller_graph_->max_block_id() + 1);
+              caller_graph_->max_block_id() + 1,
+              skipping_type_checks);
           {
             CSTAT_TIMER_SCOPE(thread(), graphinliner_build_timer);
             callee_graph = builder.BuildGraph();

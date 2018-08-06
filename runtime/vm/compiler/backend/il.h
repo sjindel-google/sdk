@@ -1525,6 +1525,10 @@ class GraphEntryInstr : public BlockEntryInstr {
     return entry_skipping_type_checks_;
   }
 
+  void set_normal_entry(TargetEntryInstr* entry) {
+    normal_entry_ = entry;
+  }
+
   void set_entry_skipping_type_checks(TargetEntryInstr* target) {
     entry_skipping_type_checks_ = target;
   }
