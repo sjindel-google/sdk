@@ -1522,7 +1522,52 @@ Fragment StreamingFlowGraphBuilder::BuildFirstTimePrologue(
   return F;
 }
 
-TargetEntryInstr* StreamingFlowGraphBuilder::BuildExtraEntryPoint(
+TargetEntryInstr* StreamingFlowGraphBuilder::BuildSharedExtraEntryPoint(
+    Fragment prologue_from_normal_entry,
+    Fragment explicit_checks,
+    Fragment implicit_checks,
+    Fragment body) {
+  ASSERT(prologue_from_normal_entry.entry == B->graph_entry_->normal_entry());
+  ASSERT(parsed_function()->has_entry_points_temp_var());
+  Instruction* prologue_start = prologue_from_normal_entry.entry->next();
+
+  auto* join_entry = B->BuildJoinEntry();
+
+  Fragment normal_entry(prologue_from_normal_entry.entry);
+  normal_entry += IntConstant(0);
+  normal_entry += StoreLocal(TokenPosition::kNoSource,
+                             parsed_function()->entry_points_temp_var());
+  normal_entry += Drop();
+  normal_entry += Goto(join_entry);
+
+  auto* extra_target_entry = B->BuildTargetEntry();
+  Fragment extra_entry(extra_target_entry);
+  extra_entry += IntConstant(1);
+  extra_entry += StoreLocal(TokenPosition::kNoSource,
+                             parsed_function()->entry_points_temp_var());
+  extra_entry += Drop();
+  extra_entry += Goto(join_entry);
+
+  join_entry->LinkTo(prologue_start);
+
+  TargetEntryInstr* do_checks, *skip_checks;
+  prologue_from_normal_entry +=
+      LoadLocal(parsed_function()->entry_points_temp_var());
+  prologue_from_normal_entry += IntConstant(1);
+  prologue_from_normal_entry +=
+      BranchIfEqual(&skip_checks, &do_checks, /*negate=*/false);
+
+  JoinEntryInstr* rest_entry = B->BuildJoinEntry();
+
+  Fragment(do_checks) + implicit_checks + Goto(rest_entry);
+  Fragment(skip_checks) + Goto(rest_entry);
+
+  Fragment(rest_entry) + explicit_checks + body;
+
+  return extra_target_entry;
+}
+
+TargetEntryInstr* StreamingFlowGraphBuilder::BuildSeparateExtraEntryPoint(
     TargetEntryInstr* normal_entry,
     Fragment normal_prologue,
     Fragment extra_prologue,
@@ -1547,6 +1592,36 @@ TargetEntryInstr* StreamingFlowGraphBuilder::BuildExtraEntryPoint(
   join += body;
 
   return extra_entry;
+}
+
+StreamingFlowGraphBuilder::ExtraEntryPointStyle
+StreamingFlowGraphBuilder::ChooseEntryPointStyle(
+    const Function& dart_function,
+    const PrologueInfo& prologue_info,
+    const Fragment& implicit_type_checks,
+    const Fragment& first_time_prologue,
+    const Fragment& every_time_prologue) {
+  if (!dart_function.MayHaveEntryPointSkippingTypeChecks(I) ||
+      implicit_type_checks.is_empty()) {
+    return ExtraEntryPointStyle::kNone;
+  }
+
+  // Record which entry-point was taken into a variable and test it later if
+  // either:
+  //
+  // 1. There is a non-empty PrologueBuilder-prologue.
+  //
+  // 2. There is a non-empty "first-time" prologue.
+  //
+  // 3. The "every-time" prologue has more than two instructions (DebugStepCheck
+  //    and CheckStackOverflow).
+  if (!prologue_info.IsEmpty() || !first_time_prologue.is_empty() ||
+      !(every_time_prologue.entry == every_time_prologue.current ||
+        every_time_prologue.current->previous() == every_time_prologue.entry)) {
+    return ExtraEntryPointStyle::kSharedWithVariable;
+  }
+
+  return ExtraEntryPointStyle::kSeparate;
 }
 
 FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
@@ -1583,11 +1658,6 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
       new (Z) GraphEntryInstr(*parsed_function(), normal_entry,
                               flow_graph_builder_->osr_id_);
 
-  auto extra_entry_point_style =
-      dart_function.MayHaveEntryPointSkippingTypeChecks(I)
-          ? ExtraEntryPointStyle::kSeparate
-          : ExtraEntryPointStyle::kNone;
-
   // The 'every_time_prologue' runs first and is run when resuming from yield
   // points.
   const Fragment every_time_prologue = BuildEveryTimePrologue(
@@ -1603,20 +1673,12 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
   CheckArgumentTypesAsNecessary(dart_function, type_parameters_offset,
                                 &explicit_type_checks, &implicit_type_checks);
 
-  if (implicit_type_checks.is_empty()) {
-    extra_entry_point_style = ExtraEntryPointStyle::kNone;
-  }
-
   const Fragment body =
       BuildFunctionBody(dart_function, first_parameter, is_constructor);
 
-  if (extra_entry_point_style == ExtraEntryPointStyle::kSeparate &&
-      (!prologue_info.IsEmpty() || !first_time_prologue.is_empty() ||
-       !(every_time_prologue.entry == every_time_prologue.current ||
-         every_time_prologue.current->previous() ==
-             every_time_prologue.entry))) {
-    extra_entry_point_style = ExtraEntryPointStyle::kSharedWithVariable;
-  }
+  auto extra_entry_point_style =
+      ChooseEntryPointStyle(dart_function, prologue_info, implicit_type_checks,
+                            first_time_prologue, every_time_prologue);
 
   Fragment function(instruction_cursor);
   if (yield_continuations().is_empty()) {
@@ -1634,16 +1696,16 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
         const Fragment prologue_copy = BuildEveryTimePrologue(
             dart_function, token_position, type_parameters_offset);
 
-        extra_entry = BuildExtraEntryPoint(normal_entry, every_time_prologue,
-                                           prologue_copy, explicit_type_checks,
-                                           implicit_type_checks, body);
+        extra_entry = BuildSeparateExtraEntryPoint(
+            normal_entry, every_time_prologue, prologue_copy,
+            explicit_type_checks, implicit_type_checks, body);
         break;
       }
       case ExtraEntryPointStyle::kSharedWithVariable: {
-        // SAMIR_TODO: Use a temporary variable to skip checks without
-        // increasing code size.
-        function += every_time_prologue + first_time_prologue +
-                    implicit_type_checks + explicit_type_checks + body;
+        extra_entry = BuildSharedExtraEntryPoint(
+            Fragment(normal_entry, instruction_cursor) +
+            every_time_prologue + first_time_prologue, explicit_type_checks,
+            implicit_type_checks, body);
         break;
       }
     }

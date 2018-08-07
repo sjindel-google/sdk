@@ -108,12 +108,23 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
                                      Fragment* explicit_checks,
                                      Fragment* implicit_checks);
   Fragment CompleteBodyWithYieldContinuations(Fragment body);
-  TargetEntryInstr* BuildExtraEntryPoint(TargetEntryInstr* normal_entry,
-                                         Fragment normal_prologue,
-                                         Fragment extra_prologue,
-                                         Fragment explicit_type_checks,
-                                         Fragment implicit_type_checks,
-                                         Fragment body);
+  TargetEntryInstr* BuildSeparateExtraEntryPoint(TargetEntryInstr* normal_entry,
+                                                 Fragment normal_prologue,
+                                                 Fragment extra_prologue,
+                                                 Fragment explicit_type_checks,
+                                                 Fragment implicit_type_checks,
+                                                 Fragment body);
+  TargetEntryInstr* BuildSharedExtraEntryPoint(Fragment prologue_from_normal_entry,
+                                               Fragment explicit_type_checks,
+                                               Fragment implicit_type_checks,
+                                               Fragment body);
+
+  static ExtraEntryPointStyle ChooseEntryPointStyle(
+      const Function& dart_function,
+      const PrologueInfo& prologue_info,
+      const Fragment& implicit_type_checks,
+      const Fragment& first_time_prologue,
+      const Fragment& every_time_prologue);
 
   void loop_depth_inc();
   void loop_depth_dec();
