@@ -3548,6 +3548,7 @@ void TargetEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   if (this ==
           compiler->flow_graph().graph_entry()->entry_skipping_type_checks() ||
       this == compiler->flow_graph().graph_entry()->normal_entry()) {
+    __ set_constant_pool_allowed(false);
     compiler->entry_point_skipping_type_checks = __ CodeSize();
     compiler->EmitPrologue();
   }
