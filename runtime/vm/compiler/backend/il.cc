@@ -3547,11 +3547,11 @@ void TargetEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   // entry-point more uniform so that edge-counters can determine the which
   // entry-point's prologue comes first.
   if (this ==
-          compiler->flow_graph().graph_entry()->entry_skipping_type_checks() ||
-      this == compiler->flow_graph().graph_entry()->normal_entry()) {
+          compiler->flow_graph().graph_entry()->entry_skipping_type_checks()) {
     __ set_constant_pool_allowed(false);
     compiler->entry_point_skipping_type_checks = __ CodeSize();
     compiler->EmitPrologue();
+    ASSERT(__ constant_pool_allowed());
   }
 #endif
 

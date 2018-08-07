@@ -1941,7 +1941,7 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
   if (add_megamorphic_call) {
     int try_index = CatchClauseNode::kInvalidTryIndex;
     EmitMegamorphicInstanceCall(function_name, arguments_descriptor, deopt_id,
-                                token_index, locs, try_index);
+                                token_index, locs, try_index, 0);
   }
 }
 

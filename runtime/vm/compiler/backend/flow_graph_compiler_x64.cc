@@ -900,13 +900,7 @@ void FlowGraphCompiler::CompileGraph() {
     return;
   }
 
-  // If we're not emitting the normal entry first, emit an explicit jump to it.
-  TargetEntryInstr* normal_entry = flow_graph().graph_entry()->normal_entry();
-  ASSERT(block_order()[0]->IsGraphEntry());
-  if (block_order()[1] != normal_entry) {
-    __ jmp(GetJumpLabel(normal_entry));
-  }
-
+  EmitPrologue();
   ASSERT(!block_order().is_empty());
   VisitBlocks();
 

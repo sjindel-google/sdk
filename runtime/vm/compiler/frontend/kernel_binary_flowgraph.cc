@@ -1703,9 +1703,9 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
       }
       case ExtraEntryPointStyle::kSharedWithVariable: {
         extra_entry = BuildSharedExtraEntryPoint(
-            Fragment(normal_entry, instruction_cursor) +
-            every_time_prologue + first_time_prologue, explicit_type_checks,
-            implicit_type_checks, body);
+            Fragment(normal_entry, instruction_cursor) + every_time_prologue +
+                first_time_prologue,
+            explicit_type_checks, implicit_type_checks, body);
         break;
       }
     }
@@ -1719,9 +1719,12 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
   } else {
     // If the function's body contains any yield points, build switch statement
     // that selects a continuation point based on the value of :await_jump_var.
-    ASSERT(implicit_type_checks.is_empty() && explicit_type_checks.is_empty());
+    ASSERT(explicit_type_checks.is_empty());
+    // SAMIR_TODO: We can probably ignore the implicit checks here since the
+    // argument is passed through generated code.
     function += every_time_prologue +
-                CompleteBodyWithYieldContinuations(first_time_prologue + body);
+                CompleteBodyWithYieldContinuations(first_time_prologue +
+                                                   implicit_type_checks + body);
   }
 
 
