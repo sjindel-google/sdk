@@ -3537,6 +3537,7 @@ LocationSummary* TargetEntryInstr::MakeLocationSummary(Zone* zone,
 void TargetEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(compiler->GetJumpLabel(this));
 
+#if !defined(TARGET_ARCH_DBC)
   if (this ==
       compiler->flow_graph().graph_entry()->entry_skipping_type_checks()) {
     compiler->entry_point_skipping_type_checks = __ CodeSize();
@@ -3552,6 +3553,7 @@ void TargetEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     compiler->entry_point_skipping_type_checks = __ CodeSize();
     compiler->EmitPrologue();
   }
+#endif
 
   if (!compiler->is_optimizing()) {
 #if !defined(TARGET_ARCH_DBC)
