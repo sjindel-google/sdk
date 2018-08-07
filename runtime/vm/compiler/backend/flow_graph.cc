@@ -239,9 +239,23 @@ void FlowGraph::DiscoverBlocks() {
   ASSERT(postorder_.length() == preorder_.length());
 
   // Create an array of blocks in reverse postorder.
+  //
+  // SAMIR_TODO: Evaluate if this is the best way to schedule the extra entry
+  // point in precomp mode.
   intptr_t block_count = postorder_.length();
+  bool skipped = false;
   for (intptr_t i = 0; i < block_count; ++i) {
-    reverse_postorder_.Add(postorder_[block_count - i - 1]);
+    intptr_t j = block_count - i - 1;
+    if (graph_entry_->entry_skipping_type_checks() == postorder_[j] &&
+        FLAG_precompiled_mode) {
+      skipped = true;
+      continue;
+    }
+    reverse_postorder_.Add(postorder_[j]);
+  }
+  if (graph_entry_->entry_skipping_type_checks() && FLAG_precompiled_mode) {
+    ASSERT(skipped);
+    reverse_postorder_.Add(graph_entry_->entry_skipping_type_checks());
   }
 
   loop_headers_ = NULL;
