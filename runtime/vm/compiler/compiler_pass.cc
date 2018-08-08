@@ -219,7 +219,9 @@ void CompilerPass::RunPipeline(PipelineMode mode,
   INVOKE_PASS(SetOuterInliningId);
   INVOKE_PASS(TypePropagation);
   INVOKE_PASS(ApplyClassIds);
-  INVOKE_PASS(OptimizeTypeCheckedCalls);
+  if (mode == kJIT) {
+    INVOKE_PASS(OptimizeTypeCheckedCalls);
+  }
   INVOKE_PASS(Inlining);
   INVOKE_PASS(TypePropagation);
   INVOKE_PASS(ApplyClassIds);
@@ -452,8 +454,6 @@ void OptimizeTypeCheckedCalls(FlowGraph* flow_graph) {
             }
           }
         }
-      } else if (FLAG_precompiled_mode) {
-        continue;
       } else if (InstanceCallInstr* instr = current->AsInstanceCall()) {
         Value* receiver = instr->Receiver();
         if (flow_graph->IsReceiver(receiver->definition())) {
