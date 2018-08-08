@@ -37,6 +37,8 @@ import 'transformations/no_dynamic_invocations_annotator.dart'
 import 'transformations/type_flow/transformer.dart' as globalTypeFlow
     show transformComponent;
 
+import 'transformations/call_site_annotator.dart' as call_site_annotator;
+
 /// Generates a kernel representation of the program whose main library is in
 /// the given [source]. Intended for whole program (non-modular) compilation.
 ///
@@ -82,6 +84,10 @@ Future<Component> compileToKernel(Uri source, CompilerOptions options,
 
   // Restore error handler (in case 'options' are reused).
   options.onProblem = errorDetector.previousErrorHandler;
+
+  if (!errorDetector.hasCompilationErrors && component != null) {
+    call_site_annotator.transformComponent(component);
+  }
 
   return component;
 }
