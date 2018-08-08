@@ -3170,14 +3170,6 @@ Fragment StreamingFlowGraphBuilder::BuildMethodInvocation(TokenPosition* p) {
   const TokenPosition position = ReadPosition();  // read position.
   if (p != NULL) *p = position;
 
-  const CallSiteAttributesMetadata call_site_attributes =
-      call_site_attributes_metadata_helper_.GetCallSiteAttributes(offset);
-  /*
-  if (call_site_attributes.receiver_type != nullptr) {
-    THR_Print("receiver_type => %s\n",
-              call_site_attributes.receiver_type->ToCString());
-  }*/
-
   const DirectCallMetadata direct_call =
       direct_call_metadata_helper_.GetDirectTargetForMethodInvocation(offset);
   const InferredTypeMetadata result_type =
