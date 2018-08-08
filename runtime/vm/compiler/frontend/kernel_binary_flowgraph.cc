@@ -1602,7 +1602,9 @@ StreamingFlowGraphBuilder::ChooseEntryPointStyle(
     const Fragment& first_time_prologue,
     const Fragment& every_time_prologue) {
   if (!dart_function.MayHaveEntryPointSkippingTypeChecks(I) ||
-      implicit_type_checks.is_empty()) {
+      implicit_type_checks.is_empty() ||
+      // SAMIR_TODO: Enable multiple-entrypoints for AOT.
+      FLAG_precompiled_mode) {
     return ExtraEntryPointStyle::kNone;
   }
 
