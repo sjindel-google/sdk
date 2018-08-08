@@ -240,6 +240,9 @@ static void PrintICDataHelper(BufferFormatter* f,
                               const ICData& ic_data,
                               intptr_t num_checks_to_print) {
   f->Print(" IC[");
+  if (ic_data.ReceiverType() != AbstractType::null()) {
+    f->Print("(%s) ", AbstractType::Handle(ic_data.ReceiverType()).ToCString());
+  }
   f->Print("%" Pd ": ", ic_data.NumberOfChecks());
   Function& target = Function::Handle();
   if ((num_checks_to_print == FlowGraphPrinter::kPrintAll) ||
@@ -249,6 +252,7 @@ static void PrintICDataHelper(BufferFormatter* f,
   for (intptr_t i = 0; i < num_checks_to_print; i++) {
     GrowableArray<intptr_t> class_ids;
     ic_data.GetCheckAt(i, &class_ids, &target);
+    auto invariance = ic_data.GetInvarianceAt(i);
     const intptr_t count = ic_data.GetCountAt(i);
     if (i > 0) {
       f->Print(" | ");
@@ -262,6 +266,17 @@ static void PrintICDataHelper(BufferFormatter* f,
       f->Print("%s", String::Handle(cls.Name()).ToCString());
     }
     f->Print(" cnt:%" Pd " trgt:'%s'", count, target.ToQualifiedCString());
+    switch (invariance.kind) {
+      case ICData::Invariance::Kind::kIsInvariant:
+        f->Print(" invariant(%" Pd ")", invariance.type_arguments_offset);
+        break;
+      case ICData::Invariance::Kind::kHasInvariantSuper:
+        f->Print(" invariant-super");
+        break;
+      case ICData::Invariance::Kind::kUnknown:
+      case ICData::Invariance::Kind::kNotInvariant:
+        break;
+    }
   }
   if (num_checks_to_print < ic_data.NumberOfChecks()) {
     f->Print("...");
@@ -657,16 +672,8 @@ void LoadFieldInstr::PrintOperandsTo(BufferFormatter* f) const {
   f->Print(", %" Pd, offset_in_bytes());
 
   if (field() != nullptr) {
-    f->Print(" {%s}", String::Handle(field()->name()).ToCString());
-    const char* expected = "?";
-    if (field()->guarded_cid() != kIllegalCid) {
-      const Class& cls = Class::Handle(
-          Isolate::Current()->class_table()->At(field()->guarded_cid()));
-      expected = String::Handle(cls.Name()).ToCString();
-    }
-
-    f->Print(" [%s %s]", field()->is_nullable() ? "nullable" : "non-nullable",
-             expected);
+    f->Print(" {%s} %s", String::Handle(field()->name()).ToCString(),
+             field()->GuardedPropertiesAsCString());
   }
 
   if (native_field() != nullptr) {
@@ -825,6 +832,10 @@ void CheckClassInstr::PrintOperandsTo(BufferFormatter* f) const {
   if (IsNullCheck()) {
     f->Print(" nullcheck");
   }
+}
+
+void CheckConditionInstr::PrintOperandsTo(BufferFormatter* f) const {
+  comparison()->PrintOperandsTo(f);
 }
 
 void InvokeMathCFunctionInstr::PrintOperandsTo(BufferFormatter* f) const {

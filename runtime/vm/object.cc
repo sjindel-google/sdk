@@ -8397,6 +8397,58 @@ void Field::GetCovarianceAttributes(bool* is_covariant,
   *is_covariant = field_helper.IsCovariant();
   *is_generic_covariant = field_helper.IsGenericCovariantImpl();
 }
+
+bool Function::HasGenericCovariantParameters() const {
+  Thread* thread = Thread::Current();
+  Zone* zone = Thread::Current()->zone();
+  auto& script = Script::Handle(zone, this->script());
+
+  kernel::TranslationHelper translation_helper(thread);
+  translation_helper.InitFromScript(script);
+
+  kernel::KernelReaderHelper kernel_reader_helper(
+      zone, &translation_helper, script,
+      ExternalTypedData::Handle(zone, KernelData()), KernelDataProgramOffset());
+  kernel_reader_helper.SetOffset(kernel_offset());
+
+  const Class& owner = Class::Handle(Owner());
+  Function& outermost = Function::Handle(zone, GetOutermostFunction());
+
+  kernel::ActiveClass active_class;
+  kernel::ActiveClassScope active_class_scope(&active_class, &owner);
+  kernel::ActiveMemberScope active_member_scope(&active_class, &outermost);
+  kernel::ActiveTypeParametersScope active_type_parameter_scope(&active_class,
+                                                                *this, zone);
+
+  if (kernel_reader_helper.PeekTag() == kernel::kProcedure) {
+    kernel_reader_helper.ReadUntilFunctionNode();
+    kernel::FunctionNodeHelper function_node_helper(&kernel_reader_helper);
+    function_node_helper.ReadUntilExcluding(
+        kernel::FunctionNodeHelper::kPositionalParameters);
+    const intptr_t positional_count = kernel_reader_helper.ReadListLength();
+    for (intptr_t i = 0; i < positional_count; i++) {
+      kernel::VariableDeclarationHelper helper(&kernel_reader_helper);
+      helper.ReadUntilExcluding(kernel::VariableDeclarationHelper::kEnd);
+      if (helper.IsGenericCovariantImpl()) {
+        return true;
+      }
+    }
+
+    const intptr_t named_count = kernel_reader_helper.ReadListLength();
+    for (intptr_t i = 0; i < named_count; i++) {
+      kernel::VariableDeclarationHelper helper(&kernel_reader_helper);
+      helper.ReadUntilExcluding(kernel::VariableDeclarationHelper::kEnd);
+      if (helper.IsGenericCovariantImpl()) {
+        return true;
+      }
+    }
+  } else {
+    // TODO(XXX) support this case.
+    return false;
+  }
+
+  return false;
+}
 #endif
 
 // Called at finalization time
@@ -8441,6 +8493,7 @@ void Field::InitializeNew(const Field& result,
   result.set_is_unboxing_candidate(true);
   result.set_initializer_changed_after_initialization(false);
   result.set_kernel_offset(0);
+  result.set_is_invariant_generic(kNotTracking);
   Isolate* isolate = Isolate::Current();
 
   // Use field guards if they are enabled and the isolate has never reloaded.
@@ -8741,7 +8794,8 @@ bool Field::IsConsistentWith(const Field& other) const {
          (raw_ptr()->is_nullable_ == other.raw_ptr()->is_nullable_) &&
          (raw_ptr()->guarded_list_length_ ==
           other.raw_ptr()->guarded_list_length_) &&
-         (is_unboxing_candidate() == other.is_unboxing_candidate());
+         (is_unboxing_candidate() == other.is_unboxing_candidate()) &&
+         (is_invariant_generic() == other.is_invariant_generic());
 }
 
 bool Field::IsUninitialized() const {
@@ -8829,7 +8883,17 @@ const char* Field::GuardedPropertiesAsCString() const {
   if (guarded_cid() == kIllegalCid) {
     return "<?>";
   } else if (guarded_cid() == kDynamicCid) {
+    ASSERT(is_invariant_generic() >= kNotInvariant);
     return "<*>";
+  }
+
+  const char* invariance = "";
+  if (is_invariant_generic() == kNotInvariant) {
+    invariance = " {!invariant}";
+  } else if (is_invariant_generic() == kIsInvariant) {
+    invariance = " {invariant}";
+  } else if (is_invariant_generic() == kIsInvariantSuper) {
+    invariance = " {super-invariant}";
   }
 
   const Class& cls =
@@ -8840,16 +8904,18 @@ const char* Field::GuardedPropertiesAsCString() const {
       is_final()) {
     ASSERT(guarded_list_length() != kUnknownFixedLength);
     if (guarded_list_length() == kNoFixedLength) {
-      return Thread::Current()->zone()->PrintToString("<%s [*]>", class_name);
+      return Thread::Current()->zone()->PrintToString("<%s [*]%s>", class_name,
+                                                      invariance);
     } else {
       return Thread::Current()->zone()->PrintToString(
-          "<%s [%" Pd " @%" Pd "]>", class_name, guarded_list_length(),
-          guarded_list_length_in_object_offset());
+          "<%s [%" Pd " @%" Pd "]%s>", class_name, guarded_list_length(),
+          guarded_list_length_in_object_offset(), invariance);
     }
   }
 
   return Thread::Current()->zone()->PrintToString(
-      "<%s %s>", is_nullable() ? "nullable" : "not-nullable", class_name);
+      "<%s %s%s>", is_nullable() ? "nullable" : "not-nullable", class_name,
+      invariance);
 }
 
 void Field::InitializeGuardedListLengthInObjectOffset() const {
@@ -8931,6 +8997,41 @@ bool Field::UpdateGuardedCidAndLength(const Object& value) const {
   return true;
 }
 
+static bool FindInstantiationOf(const Type& type,
+                                const Class& cls,
+                                GrowableArray<const AbstractType*>* types) {
+  if (type.type_class() == cls.raw()) {
+    return true;  // found instantiation
+  }
+
+  Class& cls2 = Class::Handle();
+  AbstractType& super_type = AbstractType::Handle();
+  super_type = cls.super_type();
+  if (!super_type.IsNull() && !super_type.IsObjectType()) {
+    cls2 = super_type.type_class();
+    types->Add(&super_type);
+    if (FindInstantiationOf(type, cls2, types)) {
+      return true;
+    }
+    types->RemoveLast();
+  }
+
+  Array& super_interfaces = Array::Handle(cls.interfaces());
+  for (intptr_t i = 0; i < super_interfaces.Length(); i++) {
+    super_type ^= super_interfaces.At(i);
+    cls2 = super_type.type_class();
+    types->Add(&super_type);
+    if (FindInstantiationOf(type, cls2, types)) {
+      return true;
+    }
+    types->RemoveLast();
+  }
+
+  return false;
+}
+
+__thread intptr_t count = 0;
+
 void Field::RecordStore(const Object& value) const {
   ASSERT(IsOriginal());
   if (!Isolate::Current()->use_field_guards()) {
@@ -8942,7 +9043,113 @@ void Field::RecordStore(const Object& value) const {
               value.ToCString());
   }
 
-  if (UpdateGuardedCidAndLength(value)) {
+  bool invalidate = UpdateGuardedCidAndLength(value);
+
+  if (guarded_cid() == kDynamicCid && is_invariant_generic() != kNotTracking) {
+    if (FLAG_trace_field_guards) {
+      THR_Print(
+          "  => switching off invariance tracking because guarded cid is "
+          "dynamic\n");
+    }
+    set_is_invariant_generic(kNotInvariant);
+  }
+
+  if ((is_invariant_generic() == kIsInvariant) && !value.IsNull()) {
+    ASSERT(guarded_cid() != kNullCid);
+
+    const Instance& instance = Instance::Cast(value);
+    Type& t = Type::Handle();
+    t ^= type();
+    ASSERT(t.IsFinalized());
+    const Class& cls = Class::Handle(instance.clazz());
+    GrowableArray<const AbstractType*> trace(10);
+    FindInstantiationOf(t, cls, &trace);
+    Error& error = Error::Handle();
+    if (trace.length() > 0) {
+      TypeArguments& args = TypeArguments::Handle();
+      AbstractType& type = AbstractType::Handle(trace.Last()->raw());
+      for (intptr_t i = trace.length() - 2; (i >= 0) && !type.IsInstantiated();
+           i--) {
+        args = trace[i]->arguments();
+        type = type.InstantiateFrom(args, TypeArguments::null_type_arguments(),
+                                    kAllFree, &error, nullptr, nullptr,
+                                    Heap::kNew);
+      }
+
+      // No reason to check anything the type is instantiated.
+      if (FLAG_trace_field_guards) {
+        THR_Print("  => %s -> %s\n", t.ToCString(), type.ToCString());
+      }
+
+      if (type.IsInstantiated()) {
+        // Check if type arguments match.
+        args = type.arguments();
+        if (args.Equals(TypeArguments::Handle(t.arguments()))) {
+          set_is_invariant_generic(kIsInvariantSuper);
+        } else {
+          if (FLAG_trace_field_guards) {
+            THR_Print(
+                "  expected %s got %s type arguments\n",
+                TypeArguments::Handle(t.arguments()).ToCString(),
+                TypeArguments::Handle(instance.GetTypeArguments()).ToCString());
+          }
+          set_is_invariant_generic(kNotInvariant);
+          invalidate = true;
+        }
+      } else {
+        ASSERT(cls.IsGeneric());
+        AbstractType& type_arg = AbstractType::Handle();
+        const intptr_t num_type_params = cls.NumTypeParameters();
+        bool simple_case =
+            (num_type_params ==
+             Class::Handle(t.type_class()).NumTypeParameters()) &&
+            instance.GetTypeArguments() == t.arguments();
+        if (!simple_case && FLAG_trace_field_guards) {
+          THR_Print(
+              "Not a simple case: %" Pd " vs %" Pd
+              " type parameters, %s vs %s type arguments\n",
+              num_type_params,
+              Class::Handle(t.type_class()).NumTypeParameters(),
+              TypeArguments::Handle(instance.GetTypeArguments()).ToCString(),
+              TypeArguments::Handle(t.arguments()).ToCString());
+        }
+        args = type.arguments();
+        for (intptr_t i = 0; (i < num_type_params) && simple_case; i++) {
+          type_arg = args.TypeAt(i);
+          if (!type_arg.IsTypeParameter() ||
+              (TypeParameter::Cast(type_arg).index() != i)) {
+            if (FLAG_trace_field_guards) {
+              THR_Print("  => encountered %s at index % " Pd "\n",
+                        type_arg.ToCString(), i);
+            }
+            simple_case = false;
+          }
+        }
+
+        if (simple_case) {
+          // Default.
+        } else {
+          set_is_invariant_generic(kNotInvariant);
+          invalidate = true;
+        }
+      }
+    } else {
+      // Check type arguments match.
+      ASSERT(cls.raw() == t.type_class());
+      if (instance.GetTypeArguments() != t.arguments()) {
+        if (FLAG_trace_field_guards) {
+          THR_Print(
+              "  expected %s got %s type arguments\n",
+              TypeArguments::Handle(t.arguments()).ToCString(),
+              TypeArguments::Handle(instance.GetTypeArguments()).ToCString());
+        }
+        set_is_invariant_generic(kNotInvariant);
+        invalidate = true;
+      }
+    }
+  }
+
+  if (invalidate) {
     if (FLAG_trace_field_guards) {
       THR_Print("    => %s\n", GuardedPropertiesAsCString());
     }
@@ -8958,6 +9165,9 @@ void Field::ForceDynamicGuardedCidAndLength() const {
   set_is_nullable(true);
   set_guarded_list_length(Field::kNoFixedLength);
   set_guarded_list_length_in_object_offset(Field::kUnknownLengthOffset);
+  if (is_invariant_generic() != kNotTracking) {
+    set_is_invariant_generic(kNotInvariant);
+  }
   // Drop any code that relied on the above assumptions.
   DeoptimizeDependentCode();
 }
@@ -13555,6 +13765,10 @@ RawUnlinkedCall* UnlinkedCall::New() {
   return reinterpret_cast<RawUnlinkedCall*>(raw);
 }
 
+void ICData::SetReceiverType(const AbstractType& type) const {
+  StorePointer(&raw_ptr()->receiver_type_, type.raw());
+}
+
 void ICData::ResetSwitchable(Zone* zone) const {
   ASSERT(NumArgsTested() == 1);
   set_ic_data_array(Array::Handle(zone, CachedEmptyICDataArray(1)));
@@ -13700,7 +13914,8 @@ void ICData::set_state_bits(uint32_t bits) const {
 }
 
 intptr_t ICData::TestEntryLengthFor(intptr_t num_args) {
-  return num_args + 1 /* target function*/ + 1 /* frequency */;
+  return num_args + 1 /* target function*/ + 1 /* frequency */ +
+         1 /* invariance state */;
 }
 
 intptr_t ICData::TestEntryLength() const {
@@ -13975,6 +14190,7 @@ bool ICData::ValidateInterceptor(const Function& target) const {
 void ICData::AddCheck(const GrowableArray<intptr_t>& class_ids,
                       const Function& target,
                       intptr_t count) const {
+  RELEASE_ASSERT(ReceiverType() == AbstractType::null());
   ASSERT(!target.IsNull());
   ASSERT((target.name() == target_name()) || ValidateInterceptor(target));
   DEBUG_ASSERT(!HasCheck(class_ids));
@@ -14019,7 +14235,10 @@ void ICData::AddCheck(const GrowableArray<intptr_t>& class_ids,
   ASSERT(!target.IsNull());
   data.SetAt(data_pos++, target);
   value = Smi::New(count);
+  data.SetAt(data_pos++, value);
+  value = Smi::New(Invariance{Invariance::Kind::kUnknown, 0}.Encode());
   data.SetAt(data_pos, value);
+
   // Multithreaded access to ICData requires setting of array to be the last
   // operation.
   set_ic_data_array(data);
@@ -14072,7 +14291,10 @@ void ICData::DebugDump() const {
 
 void ICData::AddReceiverCheck(intptr_t receiver_class_id,
                               const Function& target,
-                              intptr_t count) const {
+                              intptr_t count,
+                              ICData::Invariance invariance) const {
+  RELEASE_ASSERT(ReceiverType() == AbstractType::null() ||
+                 invariance.kind != Invariance::Kind::kUnknown);
 #if defined(DEBUG)
   GrowableArray<intptr_t> class_ids(1);
   class_ids.Add(receiver_class_id);
@@ -14098,6 +14320,7 @@ void ICData::AddReceiverCheck(intptr_t receiver_class_id,
   if (Isolate::Current()->compilation_allowed()) {
     data.SetAt(data_pos + 1, target);
     data.SetAt(data_pos + 2, Smi::Handle(Smi::New(count)));
+    data.SetAt(data_pos + 3, Smi::Handle(Smi::New(invariance.Encode())));
   } else {
     // Precompilation only, after all functions have been compiled.
     ASSERT(target.HasCode());
@@ -14110,6 +14333,13 @@ void ICData::AddReceiverCheck(intptr_t receiver_class_id,
   // Multithreaded access to ICData requires setting of array to be the last
   // operation.
   set_ic_data_array(data);
+}
+
+ICData::Invariance ICData::GetInvarianceAt(intptr_t index) const {
+  const Array& data = Array::Handle(ic_data());
+  intptr_t data_pos = index * TestEntryLength();
+  return Invariance::Decode(
+      Smi::Value(Smi::RawCast(data.At(data_pos + NumArgsTested() + 2))));
 }
 
 void ICData::GetCheckAt(intptr_t index,
@@ -14590,6 +14820,7 @@ RawICData* ICData::Clone(const ICData& from) {
     cloned_array.SetAt(i, obj);
   }
   result.set_ic_data_array(cloned_array);
+  result.SetReceiverType(AbstractType::Handle(from.ReceiverType()));
   // Copy deoptimization reasons.
   result.SetDeoptReasons(from.DeoptReasons());
   return result.raw();

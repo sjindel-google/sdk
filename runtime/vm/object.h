@@ -1777,6 +1777,10 @@ class UnlinkedCall : public Object {
 // compilation. Code may contain only original ICData objects.
 class ICData : public Object {
  public:
+  RawAbstractType* ReceiverType() const { return raw_ptr()->receiver_type_; }
+
+  void SetReceiverType(const AbstractType& type) const;
+
   RawFunction* Owner() const;
 
   RawICData* Original() const;
@@ -1909,6 +1913,10 @@ class ICData : public Object {
 
   static intptr_t owner_offset() { return OFFSET_OF(RawICData, owner_); }
 
+  static intptr_t receiver_type_offset() {
+    return OFFSET_OF(RawICData, receiver_type_);
+  }
+
   // Replaces entry |index| with the sentinel.
   void WriteSentinelAt(intptr_t index) const;
 
@@ -1942,11 +1950,55 @@ class ICData : public Object {
   void AddCheck(const GrowableArray<intptr_t>& class_ids,
                 const Function& target,
                 intptr_t count = 1) const;
+
+  struct Invariance {
+    enum class Kind {
+      kUnknown,
+      kNotInvariant,
+      kIsInvariant,
+      kHasInvariantSuper,
+    };
+
+    Kind kind;
+    intptr_t type_arguments_offset;
+
+    bool IsInvariant() const {
+      return kind >= Kind::kIsInvariant;
+    }
+
+    intptr_t Encode() const {
+      switch (kind) {
+        case Kind::kIsInvariant:
+          RELEASE_ASSERT(type_arguments_offset > 0);
+          return type_arguments_offset / 2;
+        case Kind::kHasInvariantSuper:
+          return 0;
+        case Kind::kNotInvariant:
+        case Kind::kUnknown:
+          return -1;
+      }
+    }
+
+    static Invariance Decode(const intptr_t value) {
+      if (value < 0) {
+        return {Kind::kNotInvariant, 0};
+      } else if (value == 0) {
+        return {Kind::kHasInvariantSuper, 0};
+      } else {
+        return {Kind::kIsInvariant, value * 2};
+      }
+    }
+  };
+
+  Invariance GetInvarianceAt(intptr_t count) const;
+
   // Adds sorted so that Smi is the first class-id. Use only for
   // num_args_tested == 1.
   void AddReceiverCheck(intptr_t receiver_class_id,
                         const Function& target,
-                        intptr_t count = 1) const;
+                        intptr_t count = 1,
+                        Invariance invariance = {Invariance::Kind::kUnknown,
+                                                 0}) const;
 
   // Does entry |index| contain the sentinel value?
   bool IsSentinelAt(intptr_t index) const;
@@ -2209,6 +2261,8 @@ class Function : public Object {
 
   RawAbstractType* result_type() const { return raw_ptr()->result_type_; }
   void set_result_type(const AbstractType& value) const;
+
+  bool HasGenericCovariantParameters() const;
 
   RawAbstractType* ParameterTypeAt(intptr_t index) const;
   void SetParameterTypeAt(intptr_t index, const AbstractType& value) const;
@@ -3292,6 +3346,26 @@ class Field : public Object {
     ASSERT(Thread::Current()->IsMutatorThread());
     set_kind_bits(
         HasInitializerBit::update(has_initializer, raw_ptr()->kind_bits_));
+  }
+
+  enum InvariantGenericFieldState {
+    kIsInvariant,
+    kIsInvariantSuper,
+    kNotInvariant,
+    kNotTracking,
+  };
+
+  InvariantGenericFieldState is_invariant_generic() const {
+    return static_cast<InvariantGenericFieldState>(
+        raw_ptr()->is_invariant_generic_);
+  }
+
+  void set_is_invariant_generic(InvariantGenericFieldState value) const {
+    StoreNonPointer(&raw_ptr()->is_invariant_generic_, value);
+  }
+
+  static intptr_t is_invariant_generic_offset() {
+    return OFFSET_OF(RawField, is_invariant_generic_);
   }
 
   // Return class id that any non-null value read from this field is guaranteed
@@ -6386,9 +6460,7 @@ class Type : public AbstractType {
   static intptr_t type_class_id_offset() {
     return OFFSET_OF(RawType, type_class_id_);
   }
-  static intptr_t arguments_offset() {
-    return OFFSET_OF(RawType, type_class_id_);
-  }
+  static intptr_t arguments_offset() { return OFFSET_OF(RawType, arguments_); }
   static intptr_t type_state_offset() {
     return OFFSET_OF(RawType, type_state_);
   }

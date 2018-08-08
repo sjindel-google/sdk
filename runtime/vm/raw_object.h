@@ -1080,6 +1080,7 @@ class RawField : public RawObject {
   // guarded_cid_. Stored corrected by -kHeapObjectTag to simplify code
   // generated on platforms with weak addressing modes (ARM).
   int8_t guarded_list_length_in_object_offset_;
+  int8_t is_invariant_generic_;
 
   uint8_t kind_bits_;  // static, final, const, has initializer....
 
@@ -1660,6 +1661,7 @@ class RawICData : public RawObject {
   RawArray* ic_data_;          // Contains class-ids, target and count.
   RawString* target_name_;     // Name of target function.
   RawArray* args_descriptor_;  // Arguments descriptor.
+  RawAbstractType* receiver_type_;  // Static type of the receiver.
   RawObject* owner_;  // Parent/calling function or original IC of cloned IC.
   VISIT_TO(RawObject*, owner_);
   RawObject** to_snapshot(Snapshot::Kind kind) {

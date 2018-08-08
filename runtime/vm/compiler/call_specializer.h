@@ -86,6 +86,8 @@ class CallSpecializer : public FlowGraphVisitor {
 
   void ReplaceCall(Definition* call, Definition* replacement);
 
+  void AddInvarianceGuard(InstanceCallInstr* call, intptr_t receiver_cid);
+
   // Add a class check for the call's first argument (receiver).
   void AddReceiverCheck(InstanceCallInstr* call) {
     AddChecksForArgNr(call, call->Receiver()->definition(),

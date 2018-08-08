@@ -110,6 +110,11 @@ class FlowGraphInliner : ValueObject {
     return speculative_policy_;
   }
 
+  struct InvarianceInfo {
+    const bool is_invariant;
+    bool emit_invariant_guard;
+  };
+
   static bool TryReplaceInstanceCallWithInline(
       FlowGraph* flow_graph,
       ForwardInstructionIterator* iterator,
@@ -131,7 +136,8 @@ class FlowGraphInliner : ValueObject {
                                         const ICData* ic_data,
                                         TargetEntryInstr** entry,
                                         Instruction** last,
-                                        SpeculativeInliningPolicy* policy);
+                                        SpeculativeInliningPolicy* policy,
+                                        InvarianceInfo* invariance = nullptr);
 
  private:
   friend class CallSiteInliner;

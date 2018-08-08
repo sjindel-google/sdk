@@ -397,7 +397,8 @@ Fragment FlowGraphBuilder::InstanceCall(
     const Array& argument_names,
     intptr_t checked_argument_count,
     const Function& interface_target,
-    const InferredTypeMetadata* result_type) {
+    const InferredTypeMetadata* result_type,
+    const CallSiteAttributesMetadata* call_site_attrs) {
   const intptr_t total_count = argument_count + (type_args_len > 0 ? 1 : 0);
   ArgumentArray arguments = GetArguments(total_count);
   InstanceCallInstr* call = new (Z) InstanceCallInstr(
@@ -407,6 +408,10 @@ Fragment FlowGraphBuilder::InstanceCall(
   if ((result_type != NULL) && !result_type->IsTrivial()) {
     call->SetResultType(Z, CompileType::CreateNullable(result_type->nullable,
                                                        result_type->cid));
+  }
+  if (call_site_attrs != nullptr && call_site_attrs->receiver_type != nullptr &&
+      call_site_attrs->receiver_type->IsInstantiated()) {
+    call->set_static_receiver_type(call_site_attrs->receiver_type);
   }
   Push(call);
   return Fragment(call);
@@ -513,13 +518,15 @@ Fragment FlowGraphBuilder::NativeCall(const String* name,
   return Fragment(call);
 }
 
-Fragment FlowGraphBuilder::Return(TokenPosition position) {
+Fragment FlowGraphBuilder::Return(TokenPosition position, bool omit_type_check) {
   Fragment instructions;
   const Function& function = parsed_function_->function();
 
   // Emit a type check of the return type in checked mode for all functions
   // and in strong mode for native functions.
-  if (I->type_checks() || (function.is_native() && I->strong())) {
+  if (!omit_type_check &&
+      (I->type_checks() ||
+        (function.is_native() && I->strong()))) {
     const AbstractType& return_type =
         AbstractType::Handle(Z, function.result_type());
     instructions += CheckAssignable(return_type, Symbols::FunctionResult());
@@ -690,6 +697,11 @@ Fragment FlowGraphBuilder::StoreInstanceFieldGuarded(
     instructions += GuardFieldClass(field_clone, GetNextDeoptId());
     instructions += LoadLocal(store_expression);
     instructions += GuardFieldLength(field_clone, GetNextDeoptId());
+    if (field_clone.is_invariant_generic() != Field::kNotTracking) {
+      instructions += LoadLocal(store_expression);
+      instructions <<=
+          new (Z) GuardFieldTypeInstr(Pop(), field_clone, GetNextDeoptId());
+    }
   }
   instructions += StoreInstanceField(field_clone, is_initialization_store);
   return instructions;
@@ -859,6 +871,7 @@ Fragment FlowGraphBuilder::NativeFunctionBody(const Function& function,
 
   Fragment body;
   MethodRecognizer::Kind kind = MethodRecognizer::RecognizeKind(function);
+  bool omit_type_check = true;
   switch (kind) {
     case MethodRecognizer::kObjectEquals:
       body += LoadLocal(scopes_->this_variable);
@@ -1036,10 +1049,11 @@ Fragment FlowGraphBuilder::NativeFunctionBody(const Function& function,
         body += PushArgument();
       }
       body += NativeCall(&name, &function);
+      omit_type_check = false;
       break;
     }
   }
-  return body + Return(TokenPosition::kNoSource);
+  return body + Return(TokenPosition::kNoSource, omit_type_check);
 }
 
 Fragment FlowGraphBuilder::BuildImplicitClosureCreation(

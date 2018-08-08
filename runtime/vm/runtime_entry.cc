@@ -1198,6 +1198,141 @@ static RawFunction* ComputeTypeCheckTarget(const Instance& receiver,
   return target.raw();
 }
 
+static bool FindInstantiationOf(const AbstractType& type,
+                                const Class& cls,
+                                GrowableArray<const AbstractType*>* types) {
+  if (type.type_class() == cls.raw()) {
+    return true;  // found instantiation
+  }
+
+  Class& cls2 = Class::Handle();
+  AbstractType& super_type = AbstractType::Handle();
+  super_type = cls.super_type();
+  if (!super_type.IsNull() && !super_type.IsObjectType()) {
+    cls2 = super_type.type_class();
+    types->Add(&super_type);
+    if (FindInstantiationOf(type, cls2, types)) {
+      return true;
+    }
+    types->RemoveLast();
+  }
+
+  Array& super_interfaces = Array::Handle(cls.interfaces());
+  for (intptr_t i = 0; i < super_interfaces.Length(); i++) {
+    super_type ^= super_interfaces.At(i);
+    cls2 = super_type.type_class();
+    types->Add(&super_type);
+    if (FindInstantiationOf(type, cls2, types)) {
+      return true;
+    }
+    types->RemoveLast();
+  }
+
+  return false;
+}
+
+ICData::Invariance CheckIfRuntimeTypeMatchesStaticType(
+    const Instance& instance,
+    const Type& static_type) {
+  const bool FLAG_trace_invariance_tracking = false;
+  ASSERT(static_type.IsFinalized());
+
+  const Class& cls = Class::Handle(instance.clazz());
+  GrowableArray<const AbstractType*> trace(10);
+  FindInstantiationOf(static_type, cls, &trace);
+
+  Error& error = Error::Handle();
+  if (trace.length() > 0) {
+    TypeArguments& args = TypeArguments::Handle();
+    AbstractType& type = AbstractType::Handle(trace.Last()->raw());
+    for (intptr_t i = trace.length() - 2; (i >= 0) && !type.IsInstantiated();
+         i--) {
+      args = trace[i]->arguments();
+      type =
+          type.InstantiateFrom(args, TypeArguments::null_type_arguments(),
+                               kAllFree, &error, nullptr, nullptr, Heap::kNew);
+    }
+
+    if (FLAG_trace_invariance_tracking) {
+      THR_Print("  => %s -> %s\n", static_type.ToCString(), type.ToCString());
+    }
+
+    if (type.IsInstantiated()) {
+      // Type is fully instantiated - meaning that it does not depend on
+      // receivers type arguments.
+      args = type.arguments();
+      if (args.Equals(TypeArguments::Handle(static_type.arguments()))) {
+        return ICData::Invariance{ICData::Invariance::Kind::kHasInvariantSuper,
+                                  0};
+      } else {
+        if (FLAG_trace_invariance_tracking) {
+          THR_Print(
+              "  expected %s got %s type arguments\n",
+              TypeArguments::Handle(static_type.arguments()).ToCString(),
+              TypeArguments::Handle(instance.GetTypeArguments()).ToCString());
+        }
+        return ICData::Invariance{ICData::Invariance::Kind::kNotInvariant, 0};
+      }
+    } else {
+      // Type is not fully instantiated - meaning that it depends on
+      // receiver type parameters. Check if it is a simple case
+      // where type arguments can just be compared for equality.
+      ASSERT(cls.IsGeneric());
+      AbstractType& type_arg = AbstractType::Handle();
+      const intptr_t num_type_params = cls.NumTypeParameters();
+      bool simple_case =
+          (num_type_params ==
+           Class::Handle(static_type.type_class()).NumTypeParameters()) &&
+          instance.GetTypeArguments() == static_type.arguments();
+      if (!simple_case && FLAG_trace_invariance_tracking) {
+        THR_Print(
+            "Not a simple case: %" Pd " vs %" Pd
+            " type parameters, %s vs %s type arguments\n",
+            num_type_params,
+            Class::Handle(static_type.type_class()).NumTypeParameters(),
+            TypeArguments::Handle(instance.GetTypeArguments()).ToCString(),
+            TypeArguments::Handle(static_type.arguments()).ToCString());
+      }
+      args = type.arguments();
+      for (intptr_t i = 0; (i < num_type_params) && simple_case; i++) {
+        type_arg = args.TypeAt(i);
+        if (!type_arg.IsTypeParameter() ||
+            (TypeParameter::Cast(type_arg).index() != i)) {
+          if (FLAG_trace_invariance_tracking) {
+            THR_Print("  => encountered %s at index % " Pd "\n",
+                      type_arg.ToCString(), i);
+          }
+          simple_case = false;
+        }
+      }
+
+      if (simple_case) {
+        return ICData::Invariance{ICData::Invariance::Kind::kIsInvariant,
+                                  cls.type_arguments_field_offset()};
+      } else {
+        return ICData::Invariance{ICData::Invariance::Kind::kNotInvariant, 0};
+      }
+    }
+  } else {
+    // Check type arguments match.
+    ASSERT(cls.raw() == static_type.type_class());
+    if (instance.GetTypeArguments() == static_type.arguments()) {
+      return ICData::Invariance{ICData::Invariance::Kind::kIsInvariant,
+                                cls.type_arguments_field_offset()};
+    } else {
+      if (FLAG_trace_invariance_tracking) {
+        THR_Print(
+            "  expected %s got %s type arguments\n",
+            TypeArguments::Handle(static_type.arguments()).ToCString(),
+            TypeArguments::Handle(instance.GetTypeArguments()).ToCString());
+      }
+      return ICData::Invariance{ICData::Invariance::Kind::kNotInvariant, 0};
+    }
+  }
+
+  return ICData::Invariance{ICData::Invariance::Kind::kNotInvariant, 0};
+}
+
 static RawFunction* InlineCacheMissHandler(
     const GrowableArray<const Instance*>& args,  // Checked arguments only.
     const ICData& ic_data) {
@@ -1234,7 +1369,34 @@ static RawFunction* InlineCacheMissHandler(
     return target_function.raw();
   }
   if (args.length() == 1) {
-    ic_data.AddReceiverCheck(args[0]->GetClassId(), target_function);
+    if (ic_data.ReceiverType() != AbstractType::null()) {
+      const auto state = CheckIfRuntimeTypeMatchesStaticType(
+          *args[0], Type::Cast(AbstractType::Handle(ic_data.ReceiverType())));
+#if 0
+      switch (state.kind) {
+        case ICData::Invariance::Kind::kIsInvariant:
+          OS::PrintErr("  => type of %s matches static type\n",
+                       args[0]->ToCString());
+          break;
+        case ICData::Invariance::Kind::kHasInvariantSuper:
+          OS::PrintErr(
+              "  => type of %s matches static type (via fully instantiated "
+              "super type)\n",
+              args[0]->ToCString());
+          break;
+        case ICData::Invariance::Kind::kNotInvariant:
+          OS::PrintErr("  => type of %s does not matches static type\n",
+                       args[0]->ToCString());
+          break;
+        case ICData::Invariance::Kind::kUnknown:
+          break;
+      }
+#endif
+      ic_data.AddReceiverCheck(args[0]->GetClassId(), target_function,
+                               /*count=*/1, /*invariance=*/state);
+    } else {
+      ic_data.AddReceiverCheck(args[0]->GetClassId(), target_function);
+    }
   } else {
     GrowableArray<intptr_t> class_ids(args.length());
     ASSERT(ic_data.NumArgsTested() == args.length());

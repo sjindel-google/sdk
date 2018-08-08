@@ -59,6 +59,7 @@ class SnapshotWriter;
   V(RuntimeCallBreakpoint)                                                     \
   V(OneArgCheckInlineCache)                                                    \
   V(TwoArgsCheckInlineCache)                                                   \
+  V(OneArgCheckInlineCacheWithInvarianceCheck)                                 \
   V(SmiAddInlineCache)                                                         \
   V(SmiSubInlineCache)                                                         \
   V(SmiEqualInlineCache)                                                       \
@@ -220,7 +221,8 @@ class StubCode : public AllStatic {
       intptr_t num_args,
       const RuntimeEntry& handle_ic_miss,
       Token::Kind kind,
-      bool optimized = false);
+      bool optimized = false,
+      bool invariance_check = false);
   static void GenerateUsageCounterIncrement(Assembler* assembler,
                                             Register temp_reg);
   static void GenerateOptimizedUsageCounterIncrement(Assembler* assembler);

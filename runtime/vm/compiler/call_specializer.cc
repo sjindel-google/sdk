@@ -329,6 +329,28 @@ void CallSpecializer::AddCheckSmi(Definition* to_check,
   }
 }
 
+void CallSpecializer::AddInvarianceGuard(InstanceCallInstr* call, intptr_t receiver_cid) {
+  const Class& cls =
+      Class::Handle(Z, Isolate::Current()->class_table()->At(receiver_cid));
+
+  Definition* load_type_args = new (Z) LoadFieldInstr(
+      call->Receiver()->CopyWithType(),
+      NativeFieldDesc::GetTypeArgumentsFieldFor(Z, cls), call->token_pos());
+  InsertBefore(call, load_type_args, call->env(), FlowGraph::kValue);
+
+  const AbstractType& type =
+      AbstractType::Handle(Z, call->ic_data()->ReceiverType());
+  ASSERT(!type.IsNull());
+  const TypeArguments& args = TypeArguments::Handle(Z, type.arguments());
+  Instruction* guard = new (Z) CheckConditionInstr(
+      new StrictCompareInstr(call->token_pos(), Token::kEQ_STRICT,
+                             new (Z) Value(load_type_args),
+                             new (Z) Value(flow_graph()->GetConstant(args)),
+                             false, call->deopt_id()),
+      call->deopt_id());
+  flow_graph()->InsertBefore(call, guard, call->env(), FlowGraph::kEffect);
+}
+
 void CallSpecializer::AddCheckClass(Definition* to_check,
                                     const Cids& cids,
                                     intptr_t deopt_id,
@@ -960,7 +982,6 @@ bool CallSpecializer::TryInlineInstanceSetter(InstanceCallInstr* instr,
 
   if (I->use_field_guards()) {
     if (field.guarded_cid() != kDynamicCid) {
-      ASSERT(I->use_field_guards());
       InsertBefore(instr,
                    new (Z)
                        GuardFieldClassInstr(new (Z) Value(instr->ArgumentAt(1)),
@@ -969,12 +990,19 @@ bool CallSpecializer::TryInlineInstanceSetter(InstanceCallInstr* instr,
     }
 
     if (field.needs_length_check()) {
-      ASSERT(I->use_field_guards());
       InsertBefore(
           instr,
           new (Z) GuardFieldLengthInstr(new (Z) Value(instr->ArgumentAt(1)),
                                         field, instr->deopt_id()),
           instr->env(), FlowGraph::kEffect);
+    }
+
+    if (field.is_invariant_generic() == Field::kIsInvariant) {
+      InsertBefore(instr,
+                   new (Z)
+                       GuardFieldTypeInstr(new (Z) Value(instr->ArgumentAt(1)),
+                                           field, instr->deopt_id()),
+                   instr->env(), FlowGraph::kEffect);
     }
   }
 

@@ -161,6 +161,14 @@ void JitCallSpecializer::VisitInstanceCall(InstanceCallInstr* instr) {
     const Function& target =
         Function::ZoneHandle(Z, unary_checks.GetTargetAt(0));
     StaticCallInstr* call = StaticCallInstr::FromCall(Z, instr, target);
+    if (unary_checks.NumberOfChecks() == 1 &&
+        unary_checks.GetInvarianceAt(0).IsInvariant()) {
+      if (unary_checks.GetInvarianceAt(0).kind != ICData::Invariance::Kind::kHasInvariantSuper) {
+        AddInvarianceGuard(instr, unary_checks.GetCidAt(0));
+      }
+      call->set_can_skip_callee_type_checks(true);
+    }
+
     instr->ReplaceWith(call, current_iterator());
   } else {
     PolymorphicInstanceCallInstr* call =

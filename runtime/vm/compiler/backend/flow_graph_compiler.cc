@@ -1190,8 +1190,11 @@ void FlowGraphCompiler::GenerateInstanceCall(intptr_t deopt_id,
 
   switch (ic_data.NumArgsTested()) {
     case 1:
-      EmitInstanceCall(*StubCode::OneArgCheckInlineCache_entry(), ic_data,
-                       deopt_id, token_pos, locs);
+      EmitInstanceCall(
+          ic_data.ReceiverType() != AbstractType::null()
+              ? *StubCode::OneArgCheckInlineCacheWithInvarianceCheck_entry()
+              : *StubCode::OneArgCheckInlineCache_entry(),
+          ic_data, deopt_id, token_pos, locs);
       break;
     case 2:
       EmitInstanceCall(*StubCode::TwoArgsCheckInlineCache_entry(), ic_data,
@@ -1636,7 +1639,8 @@ const ICData* FlowGraphCompiler::GetOrAddInstanceCallICData(
     intptr_t deopt_id,
     const String& target_name,
     const Array& arguments_descriptor,
-    intptr_t num_args_tested) {
+    intptr_t num_args_tested,
+    const AbstractType& receiver_type) {
   if ((deopt_id_to_ic_data_ != NULL) &&
       ((*deopt_id_to_ic_data_)[deopt_id] != NULL)) {
     const ICData* res = (*deopt_id_to_ic_data_)[deopt_id];
@@ -1646,12 +1650,14 @@ const ICData* FlowGraphCompiler::GetOrAddInstanceCallICData(
     ASSERT(res->TypeArgsLen() ==
            ArgumentsDescriptor(arguments_descriptor).TypeArgsLen());
     ASSERT(!res->is_static_call());
+    ASSERT(res->ReceiverType() == receiver_type.raw());
     return res;
   }
   const ICData& ic_data = ICData::ZoneHandle(
       zone(), ICData::New(parsed_function().function(), target_name,
                           arguments_descriptor, deopt_id, num_args_tested,
                           ICData::kInstance));
+  ic_data.SetReceiverType(receiver_type);
 #if defined(TAG_IC_DATA)
   ic_data.set_tag(ICData::Tag::kInstanceCall);
 #endif

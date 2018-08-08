@@ -1583,7 +1583,8 @@ void StubCode::GenerateNArgsCheckInlineCacheStub(
     intptr_t num_args,
     const RuntimeEntry& handle_ic_miss,
     Token::Kind kind,
-    bool optimized) {
+    bool optimized,
+    bool invariance_check) {
   ASSERT(num_args == 1 || num_args == 2);
 #if defined(DEBUG)
   {
@@ -1630,9 +1631,9 @@ void StubCode::GenerateNArgsCheckInlineCacheStub(
 
   // Get argument count as Smi into RCX.
   __ movq(RCX, FieldAddress(R10, ArgumentsDescriptor::count_offset()));
-  // Load first argument into R9.
-  __ movq(R9, Address(RSP, RCX, TIMES_4, 0));
-  __ LoadTaggedClassIdMayBeSmi(RAX, R9);
+  // Load first argument into RDX.
+  __ movq(RDX, Address(RSP, RCX, TIMES_4, 0));
+  __ LoadTaggedClassIdMayBeSmi(RAX, RDX);
   // RAX: first argument class ID as Smi.
   if (num_args == 2) {
     // Load second argument into R9.
@@ -1647,6 +1648,7 @@ void StubCode::GenerateNArgsCheckInlineCacheStub(
   const bool optimize = kind == Token::kILLEGAL;
   const intptr_t target_offset = ICData::TargetIndexFor(num_args) * kWordSize;
   const intptr_t count_offset = ICData::CountIndexFor(num_args) * kWordSize;
+  const intptr_t invariance_offset = count_offset + kWordSize;
 
   __ Bind(&loop);
   for (int unroll = optimize ? 4 : 2; unroll >= 0; unroll--) {
@@ -1709,6 +1711,19 @@ void StubCode::GenerateNArgsCheckInlineCacheStub(
   }
 
   __ Bind(&found);
+  if (invariance_check) {
+    Label invariance_ok;
+    RELEASE_ASSERT(num_args != 2);
+    __ movq(RAX, Address(R13, invariance_offset));
+    __ cmpq(RAX, Immediate(0));
+    __ j(LESS_EQUAL, &invariance_ok);
+    __ movq(RCX, FieldAddress(RBX, ICData::receiver_type_offset()));
+    __ movq(RCX, FieldAddress(RCX, Type::arguments_offset()));
+    __ cmpq(RCX, FieldAddress(RDX, RAX, TIMES_1, 0));
+    __ j(EQUAL, &invariance_ok);
+    __ movq(Address(R13, invariance_offset), Immediate(Smi::RawValue(-1)));
+    __ Bind(&invariance_ok);
+  }
   // R13: Pointer to an IC data check group.
   __ movq(RAX, Address(R13, target_offset));
 
@@ -1753,6 +1768,14 @@ void StubCode::GenerateOneArgCheckInlineCacheStub(Assembler* assembler) {
   GenerateUsageCounterIncrement(assembler, RCX);
   GenerateNArgsCheckInlineCacheStub(
       assembler, 1, kInlineCacheMissHandlerOneArgRuntimeEntry, Token::kILLEGAL);
+}
+
+void StubCode::GenerateOneArgCheckInlineCacheWithInvarianceCheckStub(
+    Assembler* assembler) {
+  GenerateUsageCounterIncrement(assembler, RCX);
+  GenerateNArgsCheckInlineCacheStub(
+      assembler, 1, kInlineCacheMissHandlerOneArgRuntimeEntry, Token::kILLEGAL,
+      /*optimized=*/false, /*invariance_check=*/true);
 }
 
 void StubCode::GenerateTwoArgsCheckInlineCacheStub(Assembler* assembler) {

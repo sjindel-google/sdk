@@ -1649,7 +1649,8 @@ void GuardFieldClassInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     // inline. If the field needs length check we fall through to runtime
     // which is responsible for computing offset of the length field
     // based on the class id.
-    if (!field().needs_length_check()) {
+    if (!(field().needs_length_check() ||
+          field().is_invariant_generic() == Field::kIsInvariant)) {
       // Uninitialized field can be handled inline. Check if the
       // field is still unitialized.
       __ cmpw(field_cid_operand, Immediate(kIllegalCid));
@@ -1803,6 +1804,81 @@ void GuardFieldLengthInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
         Immediate(Smi::RawValue(field().guarded_list_length())));
     __ j(NOT_EQUAL, deopt);
   }
+}
+
+LocationSummary* GuardFieldTypeInstr::MakeLocationSummary(Zone* zone,
+                                                          bool opt) const {
+  const intptr_t kNumInputs = 1;
+  const intptr_t kNumTemps = 2;
+  LocationSummary* summary = new (zone)
+      LocationSummary(zone, kNumInputs, kNumTemps, LocationSummary::kNoCall);
+  summary->set_in(0, Location::RequiresRegister());
+  summary->set_temp(0, Location::RequiresRegister());
+  summary->set_temp(1, Location::RequiresRegister());
+  return summary;
+}
+
+void GuardFieldTypeInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
+  ASSERT(field().is_invariant_generic() != Field::kNotTracking);
+  const bool is_invariant =
+      field().is_invariant_generic() == Field::kIsInvariant;
+  if (!is_invariant) {
+    if (Compiler::IsBackgroundCompilation()) {
+      Compiler::AbortBackgroundCompilation(
+          deopt_id(),
+          "GuardFieldTypeInstr: field state changed during compilation");
+    }
+    ASSERT(!compiler->is_optimizing());
+    return;  // Nothing to do.
+  }
+
+  Label* deopt =
+      compiler->is_optimizing()
+          ? compiler->AddDeoptStub(deopt_id(), ICData::kDeoptGuardField)
+          : NULL;
+
+  Label done;
+
+  const Register value_reg = locs()->in(0).reg();
+  const Register value_class_reg = locs()->temp(0).reg();
+  const Register temp = locs()->temp(1).reg();
+
+  __ CompareObject(value_reg, Object::Handle());
+  __ j(EQUAL, &done);
+  if (!compiler->is_optimizing()) {
+    __ LoadObject(temp, field());
+    __ cmpb(FieldAddress(temp, Field::is_invariant_generic_offset()),
+            Immediate(Field::kIsInvariantSuper));
+    __ j(ABOVE_EQUAL, &done);
+  }
+  __ LoadClass(value_class_reg, value_reg);
+  __ movl(temp,
+          FieldAddress(value_class_reg,
+                       Class::type_arguments_field_offset_in_words_offset()));
+#if defined(DEBUG)
+  {
+    Label ok;
+    __ cmpl(temp, Immediate(Class::kNoTypeArguments));
+    __ j(NOT_EQUAL, &ok);
+    __ Unreachable("Should be handled before");
+    __ Bind(&ok);
+  }
+#endif
+
+  __ movq(temp, FieldAddress(value_reg, temp, TIMES_8, 0));
+  __ CompareObject(temp, TypeArguments::ZoneHandle(
+                             AbstractType::Handle(field().type()).arguments()));
+  if (deopt != nullptr) {
+    __ j(NOT_EQUAL, deopt);
+  } else {
+    __ j(EQUAL, &done);
+
+    __ PushObject(field());
+    __ pushq(value_reg);
+    __ CallRuntime(kUpdateFieldCidRuntimeEntry, 2);
+    __ Drop(2);
+  }
+  __ Bind(&done);
 }
 
 LocationSummary* StoreInstanceFieldInstr::MakeLocationSummary(Zone* zone,
@@ -5132,6 +5208,25 @@ void CheckClassIdInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
     __ cmpq(value, Immediate(Smi::RawValue(cids_.Extent())));
     __ j(ABOVE, deopt);
   }
+}
+
+LocationSummary* CheckConditionInstr::MakeLocationSummary(Zone* zone,
+                                                          bool opt) const {
+  comparison()->InitializeLocationSummary(zone, opt);
+  comparison()->locs()->set_out(0, Location::NoLocation());
+  return comparison()->locs();
+}
+
+void CheckConditionInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
+  Label if_true;
+  Label* if_false =
+      compiler->AddDeoptStub(deopt_id(), ICData::kDeoptCheckClass);
+  BranchLabels labels = {&if_true, if_false, &if_true};
+  Condition true_condition = comparison()->EmitComparisonCode(compiler, labels);
+  if (true_condition != INVALID_CONDITION) {
+    __ j(NegateCondition(true_condition), if_false);
+  }
+  __ Bind(&if_true);
 }
 
 LocationSummary* CheckArrayBoundInstr::MakeLocationSummary(Zone* zone,

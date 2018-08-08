@@ -553,6 +553,7 @@ struct InstrAttrs {
   M(CheckClassId, kNoGC)                                                       \
   M(CheckSmi, kNoGC)                                                           \
   M(CheckNull, kNoGC)                                                          \
+  M(CheckCondition, kNoGC)                                                     \
   M(Constant, kNoGC)                                                           \
   M(UnboxedConstant, kNoGC)                                                    \
   M(CheckEitherNonSmi, kNoGC)                                                  \
@@ -580,6 +581,7 @@ struct InstrAttrs {
   /*We could be more precise about when these 2 instructions can trigger GC.*/ \
   M(GuardFieldClass, _)                                                        \
   M(GuardFieldLength, _)                                                       \
+  M(GuardFieldType, _)                                                         \
   M(IfThenElse, kNoGC)                                                         \
   M(MaterializeObject, _)                                                      \
   M(TestSmi, kNoGC)                                                            \
@@ -616,6 +618,10 @@ FOR_EACH_ABSTRACT_INSTRUCTION(FORWARD_DECLARATION)
   virtual type##Instr* As##type() { return this; }                             \
   virtual const char* DebugName() const { return #type; }
 
+#define DEFINE_INSTRUCTION_TYPE_CHECK_NEW(type)                                \
+  type##Instr* As##type() override { return this; }                            \
+  const char* DebugName() const override { return #type; }
+
 // Functions required in all concrete instruction classes.
 #define DECLARE_INSTRUCTION_NO_BACKEND(type)                                   \
   virtual Tag tag() const { return k##type; }                                  \
@@ -628,9 +634,24 @@ FOR_EACH_ABSTRACT_INSTRUCTION(FORWARD_DECLARATION)
   virtual void EmitNativeCode(FlowGraphCompiler* compiler);
 
 // Functions required in all concrete instruction classes.
+#define DECLARE_INSTRUCTION_NO_BACKEND_NEW(type)                               \
+  Tag tag() const override { return k##type; }                                 \
+  void Accept(FlowGraphVisitor* visitor) override;                             \
+  DEFINE_INSTRUCTION_TYPE_CHECK_NEW(type)
+
+#define DECLARE_INSTRUCTION_BACKEND_NEW()                                      \
+  LocationSummary* MakeLocationSummary(Zone* zone, bool optimizing)            \
+      const override;                                                          \
+  void EmitNativeCode(FlowGraphCompiler* compiler) override;
+
+// Functions required in all concrete instruction classes.
 #define DECLARE_INSTRUCTION(type)                                              \
   DECLARE_INSTRUCTION_NO_BACKEND(type)                                         \
   DECLARE_INSTRUCTION_BACKEND()
+
+#define DECLARE_INSTRUCTION_NEW(type)                                          \
+  DECLARE_INSTRUCTION_NO_BACKEND_NEW(type)                                     \
+  DECLARE_INSTRUCTION_BACKEND_NEW()
 
 #if defined(TARGET_ARCH_DBC)
 #define DECLARE_COMPARISON_METHODS                                             \
@@ -661,6 +682,8 @@ FOR_EACH_ABSTRACT_INSTRUCTION(FORWARD_DECLARATION)
 #ifndef PRODUCT
 #define PRINT_OPERANDS_TO_SUPPORT                                              \
   virtual void PrintOperandsTo(BufferFormatter* f) const;
+#define PRINT_OPERANDS_TO_SUPPORT_NEW                                          \
+  virtual void PrintOperandsTo(BufferFormatter* f) const override;
 #else
 #define PRINT_OPERANDS_TO_SUPPORT
 #endif  // !PRODUCT
@@ -1069,6 +1092,7 @@ class Instruction : public ZoneAllocated {
  private:
   friend class BranchInstr;      // For RawSetInputAt.
   friend class IfThenElseInstr;  // For RawSetInputAt.
+  friend class CheckConditionInstr;  // For RawSetInputAt.
 
   virtual void RawSetInputAt(intptr_t i, Value* value) = 0;
 
@@ -3315,6 +3339,11 @@ class InstanceCallInstr : public TemplateDartCall<0> {
   intptr_t checked_argument_count() const { return checked_argument_count_; }
   const Function& interface_target() const { return interface_target_; }
 
+  void set_static_receiver_type(const AbstractType* receiver_type) {
+    ASSERT(receiver_type != nullptr && receiver_type->IsInstantiated());
+    static_receiver_type_ = receiver_type;
+  }
+
   bool has_unique_selector() const { return has_unique_selector_; }
   void set_has_unique_selector(bool b) { has_unique_selector_ = b; }
 
@@ -3376,6 +3405,8 @@ class InstanceCallInstr : public TemplateDartCall<0> {
   CompileType* result_type_;  // Inferred result type.
   bool has_unique_selector_;
   bool can_skip_callee_type_checks_ = false;
+
+  const AbstractType* static_receiver_type_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(InstanceCallInstr);
 };
@@ -4305,6 +4336,23 @@ class GuardFieldLengthInstr : public GuardFieldInstr {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(GuardFieldLengthInstr);
+};
+
+class GuardFieldTypeInstr : public GuardFieldInstr {
+ public:
+  GuardFieldTypeInstr(Value* value, const Field& field, intptr_t deopt_id)
+      : GuardFieldInstr(value, field, deopt_id) {
+    CheckField(field);
+  }
+
+  DECLARE_INSTRUCTION(GuardFieldType)
+
+  virtual Instruction* Canonicalize(FlowGraph* flow_graph);
+
+  virtual bool AttributesEqual(Instruction* other) const;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(GuardFieldTypeInstr);
 };
 
 class LoadStaticFieldInstr : public TemplateDefinition<1, NoThrow> {
@@ -7343,6 +7391,50 @@ class GenericCheckBoundInstr : public TemplateInstruction<2, Throws, NoCSE> {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(GenericCheckBoundInstr);
+};
+
+class CheckConditionInstr final : public Instruction {
+ public:
+  CheckConditionInstr(ComparisonInstr* comparison, intptr_t deopt_id)
+      : Instruction(deopt_id), comparison_(comparison) {
+    ASSERT(comparison->ArgumentCount() == 0);
+    ASSERT(comparison->env() == nullptr);
+    for (intptr_t i = comparison->InputCount() - 1; i >= 0; --i) {
+      comparison->InputAt(i)->set_instruction(this);
+    }
+  }
+
+  ComparisonInstr* comparison() const { return comparison_; }
+
+  DECLARE_INSTRUCTION_NEW(CheckCondition)
+
+  bool ComputeCanDeoptimize() const override { return true; }
+
+  Instruction* Canonicalize(FlowGraph* flow_graph) override;
+
+  bool AllowsCSE() const override { return true; }
+  bool HasUnknownSideEffects() const override { return false; }
+
+  bool AttributesEqual(Instruction* other) const override {
+    return other->Cast<CheckConditionInstr>()->comparison()->AttributesEqual(
+        comparison());
+  }
+
+  intptr_t InputCount() const override { return comparison()->InputCount(); }
+  Value* InputAt(intptr_t i) const override { return comparison()->InputAt(i); }
+
+  bool MayThrow() const override { return false; }
+
+  PRINT_OPERANDS_TO_SUPPORT_NEW
+
+ private:
+  void RawSetInputAt(intptr_t i, Value* value) override {
+    comparison()->RawSetInputAt(i, value);
+  }
+
+  ComparisonInstr* comparison_;
+
+  DISALLOW_COPY_AND_ASSIGN(CheckConditionInstr);
 };
 
 class UnboxedIntConverterInstr : public TemplateDefinition<1, NoThrow> {

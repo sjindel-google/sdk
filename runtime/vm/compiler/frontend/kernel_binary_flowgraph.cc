@@ -2323,10 +2323,11 @@ Fragment StreamingFlowGraphBuilder::InstanceCall(
     const Array& argument_names,
     intptr_t checked_argument_count,
     const Function& interface_target,
-    const InferredTypeMetadata* result_type) {
+    const InferredTypeMetadata* result_type,
+    const CallSiteAttributesMetadata* call_site_attrs) {
   return flow_graph_builder_->InstanceCall(
       position, name, kind, type_args_len, argument_count, argument_names,
-      checked_argument_count, interface_target, result_type);
+      checked_argument_count, interface_target, result_type, call_site_attrs);
 }
 
 Fragment StreamingFlowGraphBuilder::ThrowException(TokenPosition position) {
@@ -2655,7 +2656,12 @@ TestFragment StreamingFlowGraphBuilder::TranslateConditionForControl() {
     BranchInstr* branch;
     if (stack()->definition()->IsStrictCompare() &&
         stack()->definition() == instructions.current) {
-      branch = new (Z) BranchInstr(Pop()->definition()->AsStrictCompare(),
+      StrictCompareInstr* compare = Pop()->definition()->AsStrictCompare();
+      if (negate) {
+        compare->NegateComparison();
+        negate = false;
+      }
+      branch = new (Z) BranchInstr(compare,
                                    flow_graph_builder_->GetNextDeoptId());
       branch->comparison()->ClearTempIndex();
       ASSERT(instructions.current->previous() != nullptr);
@@ -2666,10 +2672,11 @@ TestFragment StreamingFlowGraphBuilder::TranslateConditionForControl() {
       Value* right_value = Pop();
       Value* left_value = Pop();
       StrictCompareInstr* compare = new (Z) StrictCompareInstr(
-          TokenPosition::kNoSource, Token::kEQ_STRICT, left_value, right_value,
+          TokenPosition::kNoSource, negate ? Token::kNE_STRICT : Token::kEQ_STRICT, left_value, right_value,
           false, flow_graph_builder_->GetNextDeoptId());
       branch =
           new (Z) BranchInstr(compare, flow_graph_builder_->GetNextDeoptId());
+      negate = false;
     }
     instructions <<= branch;
 
@@ -3334,6 +3341,14 @@ Fragment StreamingFlowGraphBuilder::BuildMethodInvocation(TokenPosition* p) {
   const TokenPosition position = ReadPosition();  // read position.
   if (p != NULL) *p = position;
 
+  const CallSiteAttributesMetadata call_site_attributes =
+      call_site_attributes_metadata_helper_.GetCallSiteAttributes(offset);
+  /*
+  if (call_site_attributes.receiver_type != nullptr) {
+    THR_Print("receiver_type => %s\n",
+              call_site_attributes.receiver_type->ToCString());
+  }*/
+
   const DirectCallMetadata direct_call =
       direct_call_metadata_helper_.GetDirectTargetForMethodInvocation(offset);
   const InferredTypeMetadata result_type =
@@ -3496,7 +3511,7 @@ Fragment StreamingFlowGraphBuilder::BuildMethodInvocation(TokenPosition* p) {
     instructions +=
         InstanceCall(position, *mangled_name, token_kind, type_args_len,
                      argument_count, argument_names, checked_argument_count,
-                     *interface_target, &result_type);
+                     *interface_target, &result_type, &call_site_attributes);
   }
 
   // Drop temporaries preserving result on the top of the stack.

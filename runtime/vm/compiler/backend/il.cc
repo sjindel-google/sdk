@@ -879,6 +879,10 @@ bool GuardFieldLengthInstr::AttributesEqual(Instruction* other) const {
   return field().raw() == other->AsGuardFieldLength()->field().raw();
 }
 
+bool GuardFieldTypeInstr::AttributesEqual(Instruction* other) const {
+  return field().raw() == other->AsGuardFieldType()->field().raw();
+}
+
 bool AssertAssignableInstr::AttributesEqual(Instruction* other) const {
   AssertAssignableInstr* other_assert = other->AsAssertAssignable();
   ASSERT(other_assert != NULL);
@@ -2617,10 +2621,11 @@ Definition* LoadFieldInstr::Canonicalize(FlowGraph* flow_graph) {
     } else if (LoadFieldInstr* load_array = array->AsLoadField()) {
       // For arrays with guarded lengths, replace the length load
       // with a constant.
-      const Field* field = load_array->field();
-      if ((field != nullptr) && (field->guarded_list_length() >= 0)) {
-        return flow_graph->GetConstant(
-            Smi::Handle(Smi::New(field->guarded_list_length())));
+      if (const Field* field = load_array->field()) {
+        if (field->guarded_list_length() >= 0) {
+          return flow_graph->GetConstant(
+              Smi::Handle(Smi::New(field->guarded_list_length())));
+        }
       }
     }
   } else if (native_field() != nullptr &&
@@ -2629,9 +2634,24 @@ Definition* LoadFieldInstr::Canonicalize(FlowGraph* flow_graph) {
     if (StaticCallInstr* call = array->AsStaticCall()) {
       if (call->is_known_list_constructor()) {
         return call->ArgumentAt(0);
+      } else if (call->function().recognized_kind() == MethodRecognizer::kLinkedHashMap_getData) {
+        return flow_graph->constant_null();
       }
     } else if (CreateArrayInstr* create_array = array->AsCreateArray()) {
       return create_array->element_type()->definition();
+    } else if (LoadFieldInstr* load_array = array->AsLoadField()) {
+      // For arrays with guarded lengths, replace the length load
+      // with a constant.
+      if (const Field* field = load_array->field()) {
+        if (field->is_invariant_generic() < Field::kNotInvariant) {
+          return flow_graph->GetConstant(TypeArguments::Handle(
+              AbstractType::Handle(field->type()).arguments()));
+        }
+      } else if (const NativeFieldDesc* native_field = load_array->native_field()) {
+        if (native_field == NativeFieldDesc::LinkedHashMap_data()) {
+          return flow_graph->constant_null();
+        }
+      }
     }
   }
 
@@ -3303,6 +3323,11 @@ Instruction* GuardFieldLengthInstr::Canonicalize(FlowGraph* flow_graph) {
   return this;
 }
 
+Instruction* GuardFieldTypeInstr::Canonicalize(FlowGraph* flow_graph) {
+  return (field().is_invariant_generic() >= Field::kIsInvariantSuper) ? nullptr
+                                                                      : this;
+}
+
 Instruction* CheckSmiInstr::Canonicalize(FlowGraph* flow_graph) {
   return (value()->Type()->ToCid() == kSmiCid) ? NULL : this;
 }
@@ -3857,7 +3882,9 @@ void InstanceCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
         Array::Handle(zone, GetArgumentsDescriptor());
     call_ic_data = compiler->GetOrAddInstanceCallICData(
         deopt_id(), function_name(), arguments_descriptor,
-        checked_argument_count());
+        checked_argument_count(),
+        static_receiver_type_ != nullptr ? *static_receiver_type_
+                                         : AbstractType::Handle(zone));
   } else {
     call_ic_data = &ICData::ZoneHandle(zone, ic_data()->raw());
   }
@@ -3883,10 +3910,12 @@ void InstanceCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
                                    token_pos());
     bool is_smi_two_args_op = false;
     const StubEntry* stub_entry = TwoArgsSmiOpInlineCacheEntry(token_kind());
-    if (stub_entry != NULL) {
+    if (stub_entry != nullptr) {
       // We have a dedicated inline cache stub for this operation, add an
       // an initial Smi/Smi check with count 0.
       is_smi_two_args_op = call_ic_data->AddSmiSmiCheckForFastSmiStubs();
+    } else if (static_receiver_type_ != nullptr) {
+      // We are going to use special inline cache stub.
     }
     if (is_smi_two_args_op) {
       ASSERT(ArgumentCount() == 2);
@@ -4640,6 +4669,17 @@ bool PhiInstr::IsRedundant() const {
     if (def != first) return false;
   }
   return true;
+}
+
+Instruction* CheckConditionInstr::Canonicalize(FlowGraph* graph) {
+  if (StrictCompareInstr* strict_compare = comparison()->AsStrictCompare()) {
+    if ((InputAt(0)->definition()->OriginalDefinition() == InputAt(1)->definition()->OriginalDefinition()) &&
+        strict_compare->kind() == Token::kEQ_STRICT) {
+      return nullptr;
+    }
+  }
+  return this;
+
 }
 
 bool CheckArrayBoundInstr::IsFixedLengthArrayType(intptr_t cid) {
