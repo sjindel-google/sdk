@@ -1815,11 +1815,13 @@ void FlowGraphCompiler::EmitPolymorphicInstanceCall(
       EmitTestAndCall(targets, original_call.function_name(), args_info,
                       NULL,  // No cid match.
                       &ok,   // Found cid.
-                      deopt_id, token_pos, locs, true, total_ic_calls);
+                      deopt_id, token_pos, locs, true, total_ic_calls,
+                      original_call.can_skip_callee_type_checks());
       assembler()->Bind(&ok);
     } else {
       const ICData& unary_checks = ICData::ZoneHandle(
           zone(), original_call.ic_data()->AsUnaryClassChecks());
+      // SAMIR_TODO: Support skiping type checks on switchable calls.
       EmitSwitchableInstanceCall(unary_checks, deopt_id, token_pos, locs);
     }
   }
