@@ -462,7 +462,7 @@ Fragment StreamingFlowGraphBuilder::BuildDefaultTypeHandling(
 void StreamingFlowGraphBuilder::RecordExtraEntryPoint(TargetEntryInstr* extra_entry) {
   if (!B->IsInlining()) {
     B->graph_entry_->set_unchecked_entry(extra_entry);
-  } else if (B->SkippingTypeChecks()) {
+  } else if (B->UncheckedEntry()) {
     B->graph_entry_->set_normal_entry(extra_entry);
   }
 }

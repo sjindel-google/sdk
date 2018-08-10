@@ -961,23 +961,23 @@ class CallSiteInliner : public ValueObject {
             new (Z) InlineExitCollector(caller_graph_, call);
         FlowGraph* callee_graph;
         if (UseKernelFrontEndFor(parsed_function)) {
-          bool skipping_type_checks = false;
+          bool unchecked_entry = false;
           if (StaticCallInstr* instr = call_data->call->AsStaticCall()) {
-            skipping_type_checks = instr->can_skip_callee_type_checks();
+            unchecked_entry = instr->can_skip_callee_type_checks();
           } else if (InstanceCallInstr* instr = call_data->call->AsInstanceCall()) {
-            skipping_type_checks = instr->can_skip_callee_type_checks();
+            unchecked_entry = instr->can_skip_callee_type_checks();
           } else if (PolymorphicInstanceCallInstr* instr =
                          call_data->call->AsPolymorphicInstanceCall()) {
-            skipping_type_checks = instr->instance_call()->can_skip_callee_type_checks();
+            unchecked_entry = instr->instance_call()->can_skip_callee_type_checks();
           } else if (ClosureCallInstr* instr = call_data->call->AsClosureCall()) {
-            skipping_type_checks = instr->is_statically_checked_call();
+            unchecked_entry = instr->is_statically_checked_call();
           }
           kernel::FlowGraphBuilder builder(
               parsed_function, *ic_data_array, /* not building var desc */ NULL,
               exit_collector,
               /* optimized = */ true, Compiler::kNoOSRDeoptId,
               caller_graph_->max_block_id() + 1,
-              skipping_type_checks);
+              unchecked_entry);
           {
             CSTAT_TIMER_SCOPE(thread(), graphinliner_build_timer);
             callee_graph = builder.BuildGraph();

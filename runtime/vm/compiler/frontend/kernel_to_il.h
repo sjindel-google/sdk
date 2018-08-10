@@ -51,7 +51,7 @@ class FlowGraphBuilder : public BaseFlowGraphBuilder {
                    bool optimizing,
                    intptr_t osr_id,
                    intptr_t first_block_id = 1,
-                   bool skipping_type_checks = false);
+                   bool unchecked_entry = false);
   virtual ~FlowGraphBuilder();
 
   FlowGraph* BuildGraph();

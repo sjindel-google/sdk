@@ -112,7 +112,7 @@ class BaseFlowGraphBuilder {
       intptr_t last_used_block_id,
       ZoneGrowableArray<intptr_t>* context_level_array = nullptr,
       InlineExitCollector* exit_collector = nullptr,
-      bool skipping_type_checks = false)
+      bool unchecked_entry = false)
       : parsed_function_(parsed_function),
         function_(parsed_function_->function()),
         thread_(Thread::Current()),
@@ -126,7 +126,7 @@ class BaseFlowGraphBuilder {
         pending_argument_count_(0),
         loop_depth_(0),
         exit_collector_(exit_collector),
-        skipping_type_checks_(skipping_type_checks) {}
+        unchecked_entry_(unchecked_entry) {}
 
   Fragment LoadField(intptr_t offset, intptr_t class_id = kDynamicCid);
   Fragment LoadNativeField(const NativeFieldDesc* native_field);
@@ -237,7 +237,7 @@ class BaseFlowGraphBuilder {
 
   Fragment AssertBool(TokenPosition position);
 
-  bool SkippingTypeChecks() const { return skipping_type_checks_; }
+  bool UncheckedEntry() const { return unchecked_entry_; }
 
  protected:
   intptr_t AllocateBlockId() { return ++last_used_block_id_; }
@@ -262,7 +262,7 @@ class BaseFlowGraphBuilder {
   intptr_t loop_depth_;
   InlineExitCollector* exit_collector_;
 
-  const bool skipping_type_checks_;
+  const bool unchecked_entry_;
 
   friend class TryCatchBlock;
   friend class StreamingFlowGraphBuilder;
