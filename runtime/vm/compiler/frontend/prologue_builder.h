@@ -47,6 +47,9 @@ class PrologueBuilder : public BaseFlowGraphBuilder {
   BlockEntryInstr* BuildPrologue(BlockEntryInstr* entry,
                                  PrologueInfo* prologue_info);
 
+  static bool HasEmptyPrologue(Isolate* I, const Function& function);
+  static bool PrologueOnlyNeededOnDynamicCall(const Function& function);
+
   intptr_t last_used_block_id() const { return last_used_block_id_; }
 
  private:

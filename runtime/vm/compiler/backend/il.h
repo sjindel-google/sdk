@@ -1521,6 +1521,18 @@ class GraphEntryInstr : public BlockEntryInstr {
   }
   TargetEntryInstr* normal_entry() const { return normal_entry_; }
 
+  TargetEntryInstr* entry_skipping_type_checks() const {
+    return entry_skipping_type_checks_;
+  }
+
+  void set_normal_entry(TargetEntryInstr* entry) {
+    normal_entry_ = entry;
+  }
+
+  void set_entry_skipping_type_checks(TargetEntryInstr* target) {
+    entry_skipping_type_checks_ = target;
+  }
+
   const ParsedFunction& parsed_function() const { return parsed_function_; }
 
   const GrowableArray<CatchBlockEntryInstr*>& catch_entries() const {
@@ -1539,6 +1551,7 @@ class GraphEntryInstr : public BlockEntryInstr {
 
   const ParsedFunction& parsed_function_;
   TargetEntryInstr* normal_entry_;
+  TargetEntryInstr* entry_skipping_type_checks_ = nullptr;
   GrowableArray<CatchBlockEntryInstr*> catch_entries_;
   // Indirect targets are blocks reachable only through indirect gotos.
   GrowableArray<IndirectEntryInstr*> indirect_entries_;
@@ -3175,12 +3188,14 @@ class ClosureCallInstr : public TemplateDartCall<1> {
   ClosureCallInstr(Value* function,
                    ClosureCallNode* node,
                    PushArgumentsArray* arguments,
-                   intptr_t deopt_id)
+                   intptr_t deopt_id,
+                   bool is_statically_checked_call = false)
       : TemplateDartCall(deopt_id,
                          node->arguments()->type_args_len(),
                          node->arguments()->names(),
                          arguments,
-                         node->token_pos()) {
+                         node->token_pos()),
+        is_statically_checked_call_(is_statically_checked_call) {
     ASSERT(!arguments->is_empty());
     SetInputAt(0, function);
   }
@@ -3190,12 +3205,14 @@ class ClosureCallInstr : public TemplateDartCall<1> {
                    intptr_t type_args_len,
                    const Array& argument_names,
                    TokenPosition token_pos,
-                   intptr_t deopt_id)
+                   intptr_t deopt_id,
+                   bool is_statically_checked_call = false)
       : TemplateDartCall(deopt_id,
                          type_args_len,
                          argument_names,
                          arguments,
-                         token_pos) {
+                         token_pos),
+        is_statically_checked_call_(is_statically_checked_call) {
     ASSERT(!arguments->is_empty());
     SetInputAt(0, function);
   }
@@ -3209,10 +3226,16 @@ class ClosureCallInstr : public TemplateDartCall<1> {
 
   virtual bool HasUnknownSideEffects() const { return true; }
 
+  bool is_statically_checked_call() const {
+    return is_statically_checked_call_;
+  }
+
   PRINT_OPERANDS_TO_SUPPORT
 
  private:
   DISALLOW_COPY_AND_ASSIGN(ClosureCallInstr);
+
+  const bool is_statically_checked_call_;
 };
 
 class InstanceCallInstr : public TemplateDartCall<0> {
@@ -3342,6 +3365,14 @@ class InstanceCallInstr : public TemplateDartCall<0> {
 
   RawFunction* ResolveForReceiverClass(const Class& cls, bool allow_add = true);
 
+  bool can_skip_callee_type_checks() const {
+    return can_skip_callee_type_checks_;
+  }
+
+  void set_can_skip_callee_type_checks(bool value) {
+    can_skip_callee_type_checks_ = value;
+  }
+
  protected:
   friend class CallSpecializer;
   void set_ic_data(ICData* value) { ic_data_ = value; }
@@ -3354,6 +3385,7 @@ class InstanceCallInstr : public TemplateDartCall<0> {
   const Function& interface_target_;
   CompileType* result_type_;  // Inferred result type.
   bool has_unique_selector_;
+  bool can_skip_callee_type_checks_ = false;
 
   DISALLOW_COPY_AND_ASSIGN(InstanceCallInstr);
 };
@@ -3746,6 +3778,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
         rebind_rule_(rebind_rule),
         result_type_(NULL),
         is_known_list_constructor_(false),
+        can_skip_callee_type_checks_(false),
         identity_(AliasIdentity::Unknown()) {
     ic_data_ = GetICData(ic_data_array);
     ASSERT(function.IsZoneHandle());
@@ -3771,6 +3804,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
         rebind_rule_(rebind_rule),
         result_type_(NULL),
         is_known_list_constructor_(false),
+        can_skip_callee_type_checks_(false),
         identity_(AliasIdentity::Unknown()) {
     ASSERT(function.IsZoneHandle());
     ASSERT(!function.IsNull());
@@ -3842,6 +3876,14 @@ class StaticCallInstr : public TemplateDartCall<0> {
     is_known_list_constructor_ = value;
   }
 
+  bool can_skip_callee_type_checks() const {
+    return can_skip_callee_type_checks_;
+  }
+
+  void set_can_skip_callee_type_checks(bool value) {
+    can_skip_callee_type_checks_ = value;
+  }
+
   bool IsRecognizedFactory() const { return is_known_list_constructor(); }
 
   virtual AliasIdentity Identity() const { return identity_; }
@@ -3858,6 +3900,8 @@ class StaticCallInstr : public TemplateDartCall<0> {
 
   // 'True' for recognized list constructors.
   bool is_known_list_constructor_;
+
+  bool can_skip_callee_type_checks_;
 
   AliasIdentity identity_;
 

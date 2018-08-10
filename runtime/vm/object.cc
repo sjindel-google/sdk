@@ -5930,6 +5930,8 @@ void Function::SetInstructions(const Code& value) const {
 void Function::SetInstructionsSafe(const Code& value) const {
   StorePointer(&raw_ptr()->code_, value.raw());
   StoreNonPointer(&raw_ptr()->entry_point_, value.EntryPoint());
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  value.entry_point_skipping_type_checks());
 }
 
 void Function::AttachCode(const Code& value) const {
@@ -6023,8 +6025,8 @@ void Function::SwitchToUnoptimizedCode() const {
     Exceptions::PropagateError(error);
   }
   const Code& unopt_code = Code::Handle(zone, unoptimized_code());
-  AttachCode(unopt_code);
   unopt_code.Enable();
+  AttachCode(unopt_code);
   isolate->TrackDeoptimizedCode(current_code);
 }
 
@@ -8262,6 +8264,14 @@ RawCode* Function::EnsureHasCode() const {
   ASSERT(HasCode());
   ASSERT(unoptimized_code() == result.raw());
   return CurrentCode();
+}
+
+bool Function::MayHaveEntryPointSkippingTypeChecks(Isolate* I) const {
+#if defined(TARGET_ARCH_X64) || defined(TARGET_ARCH_ARM)
+  return NeedsArgumentTypeChecks(I) || IsImplicitClosureFunction();
+#else
+  return false;
+#endif
 }
 
 const char* Function::ToCString() const {
@@ -15223,6 +15233,7 @@ RawCode* Code::New(intptr_t pointer_offsets_length) {
     result.set_comments(Comments::New(0));
     result.set_compile_timestamp(0);
     result.set_pc_descriptors(Object::empty_descriptors());
+    result.set_entry_point_skipping_type_checks_pc(0);
   }
   return result.raw();
 }
@@ -15569,6 +15580,8 @@ void Code::DisableDartCode() const {
   const Code& new_code =
       Code::Handle(StubCode::FixCallersTarget_entry()->code());
   SetActiveInstructions(Instructions::Handle(new_code.instructions()));
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  raw_ptr()->entry_point_);
 }
 
 void Code::DisableStubCode() const {
@@ -15579,6 +15592,8 @@ void Code::DisableStubCode() const {
   const Code& new_code =
       Code::Handle(StubCode::FixAllocationStubTarget_entry()->code());
   SetActiveInstructions(Instructions::Handle(new_code.instructions()));
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  raw_ptr()->entry_point_);
 #else
   // DBC does not use allocation stubs.
   UNIMPLEMENTED();
@@ -15597,6 +15612,9 @@ void Code::SetActiveInstructions(const Instructions& instructions) const {
                   Instructions::EntryPoint(instructions.raw()));
   StoreNonPointer(&raw_ptr()->monomorphic_entry_point_,
                   Instructions::MonomorphicEntryPoint(instructions.raw()));
+  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
+                  instructions.PayloadStart() +
+                  raw_ptr()->entry_point_skipping_type_checks_pc_);
 #endif
 }
 

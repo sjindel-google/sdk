@@ -266,10 +266,17 @@ bool FlowGraphCompiler::ForceSlowPathForStackOverflow() const {
 }
 
 static bool IsEmptyBlock(BlockEntryInstr* block) {
+  // Alternate entry-points cannot be merged because they must have assembly
+  // prologue emitted which should not be included in any block they jump to.
+  const bool is_entry_point_skipping_type_checks =
+      block->PredecessorCount() == 1 &&
+      block->PredecessorAt(0)->IsGraphEntry() &&
+      block ==
+          block->PredecessorAt(0)->AsGraphEntry()->entry_skipping_type_checks();
   return !block->IsCatchBlockEntry() && !block->HasNonRedundantParallelMove() &&
          block->next()->IsGoto() &&
          !block->next()->AsGoto()->HasNonRedundantParallelMove() &&
-         !block->IsIndirectEntry();
+         !block->IsIndirectEntry() && !is_entry_point_skipping_type_checks;
 }
 
 void FlowGraphCompiler::CompactBlock(BlockEntryInstr* block) {
@@ -905,6 +912,14 @@ void FlowGraphCompiler::EmitDeopt(intptr_t deopt_id,
 }
 #endif  // defined(TARGET_ARCH_DBC)
 
+void FlowGraphCompiler::FinalizeEntryPoints(const Code& code) {
+  code.set_entry_point_skipping_type_checks_pc(
+      entry_point_skipping_type_checks);
+  code.set_entry_point_skipping_type_checks(
+      Instructions::Handle(code.instructions()).PayloadStart() +
+      entry_point_skipping_type_checks);
+}
+
 void FlowGraphCompiler::FinalizeExceptionHandlers(const Code& code) {
   ASSERT(exception_handlers_list_ != NULL);
   const ExceptionHandlers& handlers = ExceptionHandlers::Handle(
@@ -1108,6 +1123,7 @@ bool FlowGraphCompiler::TryIntrinsify() {
   // before any deoptimization point.
   ASSERT(!intrinsic_slow_path_label_.IsBound());
   assembler()->Bind(&intrinsic_slow_path_label_);
+
   return complete;
 }
 
@@ -1133,7 +1149,8 @@ void FlowGraphCompiler::GenerateCallWithDeopt(TokenPosition token_pos,
 void FlowGraphCompiler::GenerateInstanceCall(intptr_t deopt_id,
                                              TokenPosition token_pos,
                                              LocationSummary* locs,
-                                             const ICData& ic_data_in) {
+                                             const ICData& ic_data_in,
+                                             bool can_skip_callee_type_checks) {
   ICData& ic_data = ICData::ZoneHandle(ic_data_in.Original());
   if (FLAG_precompiled_mode) {
     ic_data = ic_data.AsUnaryClassChecks();
@@ -1191,7 +1208,8 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
                                            ArgumentsInfo args_info,
                                            LocationSummary* locs,
                                            const ICData& ic_data_in,
-                                           ICData::RebindRule rebind_rule) {
+                                           ICData::RebindRule rebind_rule,
+                                           bool can_skip_callee_type_checks) {
   const ICData& ic_data = ICData::ZoneHandle(ic_data_in.Original());
   const Array& arguments_descriptor = Array::ZoneHandle(
       zone(), ic_data.IsNull() ? args_info.ToArgumentsDescriptor()
@@ -1201,7 +1219,7 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
   if (is_optimizing()) {
     EmitOptimizedStaticCall(function, arguments_descriptor,
                             args_info.count_with_type_args, deopt_id, token_pos,
-                            locs);
+                            locs, can_skip_callee_type_checks);
   } else {
     ICData& call_ic_data = ICData::ZoneHandle(zone(), ic_data.raw());
     if (call_ic_data.IsNull()) {
@@ -1276,9 +1294,12 @@ void FlowGraphCompiler::EmitComment(Instruction* instr) {
 bool FlowGraphCompiler::NeedsEdgeCounter(TargetEntryInstr* block) {
   // Only emit an edge counter if there is not goto at the end of the block,
   // except for the entry block.
-  return (FLAG_reorder_basic_blocks &&
-          (!block->last_instruction()->IsGoto() ||
-           (block == flow_graph().graph_entry()->normal_entry())));
+  return (
+      FLAG_reorder_basic_blocks &&
+      (!block->last_instruction()->IsGoto() ||
+       (block == flow_graph().graph_entry()->normal_entry()) ||
+       // SAMIR_TODO: do we need this?
+       (block == flow_graph().graph_entry()->entry_skipping_type_checks())));
 }
 
 // Allocate a register that is not explictly blocked.
@@ -1785,7 +1806,8 @@ void FlowGraphCompiler::EmitPolymorphicInstanceCall(
     EmitTestAndCall(targets, original_call.function_name(), args_info,
                     deopt,  // No cid match.
                     &ok,    // Found cid.
-                    deopt_id, token_pos, locs, complete, total_ic_calls);
+                    deopt_id, token_pos, locs, complete, total_ic_calls,
+                    original_call.can_skip_callee_type_checks());
     assembler()->Bind(&ok);
   } else {
     if (complete) {
@@ -1793,11 +1815,13 @@ void FlowGraphCompiler::EmitPolymorphicInstanceCall(
       EmitTestAndCall(targets, original_call.function_name(), args_info,
                       NULL,  // No cid match.
                       &ok,   // Found cid.
-                      deopt_id, token_pos, locs, true, total_ic_calls);
+                      deopt_id, token_pos, locs, true, total_ic_calls,
+                      original_call.can_skip_callee_type_checks());
       assembler()->Bind(&ok);
     } else {
       const ICData& unary_checks = ICData::ZoneHandle(
           zone(), original_call.ic_data()->AsUnaryClassChecks());
+      // TODO(sjindel/entrypoints): Support skiping type checks on switchable calls.
       EmitSwitchableInstanceCall(unary_checks, deopt_id, token_pos, locs);
     }
   }
@@ -1813,7 +1837,8 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
                                         TokenPosition token_index,
                                         LocationSummary* locs,
                                         bool complete,
-                                        intptr_t total_ic_calls) {
+                                        intptr_t total_ic_calls,
+                                        bool can_skip_callee_type_checks) {
   ASSERT(is_optimizing());
 
   const Array& arguments_descriptor =
@@ -1855,9 +1880,9 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
     // Do not use the code from the function, but let the code be patched so
     // that we can record the outgoing edges to other code.
     const Function& function = *targets.TargetAt(smi_case)->target;
-    GenerateStaticDartCall(deopt_id, token_index,
-                           *StubCode::CallStaticFunction_entry(),
-                           RawPcDescriptors::kOther, locs, function);
+    GenerateStaticDartCall(
+        deopt_id, token_index, *StubCode::CallStaticFunction_entry(),
+        RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
     __ Drop(args_info.count_with_type_args);
     if (match_found != NULL) {
       __ Jump(match_found);
@@ -1906,9 +1931,9 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
     // Do not use the code from the function, but let the code be patched so
     // that we can record the outgoing edges to other code.
     const Function& function = *targets.TargetAt(i)->target;
-    GenerateStaticDartCall(deopt_id, token_index,
-                           *StubCode::CallStaticFunction_entry(),
-                           RawPcDescriptors::kOther, locs, function);
+    GenerateStaticDartCall(
+        deopt_id, token_index, *StubCode::CallStaticFunction_entry(),
+        RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
     __ Drop(args_info.count_with_type_args);
     if (!is_last_check || add_megamorphic_call) {
       __ Jump(match_found);
@@ -1918,7 +1943,7 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
   if (add_megamorphic_call) {
     int try_index = CatchClauseNode::kInvalidTryIndex;
     EmitMegamorphicInstanceCall(function_name, arguments_descriptor, deopt_id,
-                                token_index, locs, try_index);
+                                token_index, locs, try_index, 0);
   }
 }
 

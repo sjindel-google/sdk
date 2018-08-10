@@ -75,6 +75,12 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   Fragment BuildExpression(TokenPosition* position = NULL);
   Fragment BuildStatement();
 
+  enum class ExtraEntryPointStyle {
+    kNone,
+    kSharedWithVariable,
+    kSeparate,
+  };
+
   // Kernel offset:
   //   start of function expression -> end of function body statement
   Fragment BuildFunctionBody(const Function& dart_function,
@@ -97,9 +103,28 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
                                         LocalVariable* first_parameter);
   Fragment TypeArgumentsHandling(const Function& dart_function,
                                  intptr_t type_parameters_offset);
-  Fragment CheckArgumentTypesAsNecessary(const Function& dart_function,
-                                         intptr_t type_parameters_offset);
+  void CheckArgumentTypesAsNecessary(const Function& dart_function,
+                                     intptr_t type_parameters_offset,
+                                     Fragment* explicit_checks,
+                                     Fragment* implicit_checks);
   Fragment CompleteBodyWithYieldContinuations(Fragment body);
+  TargetEntryInstr* BuildSeparateExtraEntryPoint(BlockEntryInstr* normal_entry,
+                                                 Fragment normal_prologue,
+                                                 Fragment extra_prologue,
+                                                 Fragment shared_prologue,
+                                                 Fragment body);
+  TargetEntryInstr* BuildSharedExtraEntryPoint(Fragment prologue_from_normal_entry,
+                                               Fragment skippable_checks,
+                                               Fragment body);
+
+  static ExtraEntryPointStyle ChooseEntryPointStyle(
+      const Function& dart_function,
+      const PrologueInfo& prologue_info,
+      const Fragment& implicit_type_checks,
+      const Fragment& first_time_prologue,
+      const Fragment& every_time_prologue);
+
+  void RecordExtraEntryPoint(TargetEntryInstr* extra_entry);
 
   void loop_depth_inc();
   void loop_depth_dec();
@@ -202,7 +227,9 @@ class StreamingFlowGraphBuilder : public KernelReaderHelper {
   };
   Fragment PushAllArguments(PushedArguments* pushed);
 
-  Fragment BuildArgumentTypeChecks(TypeChecksToBuild mode);
+  void BuildArgumentTypeChecks(TypeChecksToBuild mode,
+                               Fragment* explicit_checks,
+                               Fragment* implicit_checks);
 
   Fragment ThrowException(TokenPosition position);
   Fragment BooleanNegate();

@@ -6121,8 +6121,12 @@ void ClosureCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
 
   // Function in RAX.
   ASSERT(locs()->in(0).reg() == RAX);
+  intptr_t entry_point_offset =
+      is_statically_checked_call()
+          ? Function::entry_point_skipping_type_checks_offset()
+          : Function::entry_point_offset();
   __ movq(CODE_REG, FieldAddress(RAX, Function::code_offset()));
-  __ movq(RCX, FieldAddress(RAX, Function::entry_point_offset()));
+  __ movq(RCX, FieldAddress(RAX, entry_point_offset));
 
   // RAX: Function.
   // R10: Arguments descriptor array.

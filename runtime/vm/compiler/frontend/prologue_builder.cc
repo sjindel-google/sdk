@@ -21,6 +21,11 @@ namespace kernel {
 
 #define Z (zone_)
 
+bool PrologueBuilder::PrologueOnlyNeededOnDynamicCall(const Function& function) {
+  return !function.HasOptionalParameters() &&
+         !function.IsNonImplicitClosureFunction() && !function.IsGeneric();
+}
+
 BlockEntryInstr* PrologueBuilder::BuildPrologue(BlockEntryInstr* entry,
                                                 PrologueInfo* prologue_info) {
   Isolate* isolate = Isolate::Current();
@@ -52,7 +57,10 @@ BlockEntryInstr* PrologueBuilder::BuildPrologue(BlockEntryInstr* entry,
     Fragment f = BuildFixedParameterLengthChecks(strong, nsm);
     if (link) prologue += f;
   }
-  if (function_.IsClosureFunction()) {
+  // The Kernel front-end doesn't need access to the context variable when
+  // compiling implicit closures.
+  if (function_.IsNonImplicitClosureFunction() or
+      (function_.kernel_offset() <= 0 and function_.IsClosureFunction())) {
     Fragment f = BuildClosureContextHandling();
     if (!compiling_for_osr_) prologue += f;
   }

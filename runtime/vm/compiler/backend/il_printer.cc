@@ -489,6 +489,9 @@ void ClosureCallInstr::PrintOperandsTo(BufferFormatter* f) const {
     f->Print(", ");
     PushArgumentAt(i)->value()->PrintTo(f);
   }
+  if (is_statically_checked_call()) {
+    f->Print(" skipping callee parameter checks");
+  }
 }
 
 void InstanceCallInstr::PrintOperandsTo(BufferFormatter* f) const {
@@ -516,6 +519,9 @@ void PolymorphicInstanceCallInstr::PrintOperandsTo(BufferFormatter* f) const {
   PrintTargetsHelper(f, targets_, FlowGraphPrinter::kPrintAll);
   if (complete()) {
     f->Print(" COMPLETE");
+  }
+  if (instance_call()->can_skip_callee_type_checks()) {
+    f->Print(" skipping callee type checks");
   }
 }
 
@@ -559,6 +565,9 @@ void StaticCallInstr::PrintOperandsTo(BufferFormatter* f) const {
   for (intptr_t i = 0; i < ArgumentCount(); ++i) {
     if (i > 0) f->Print(", ");
     PushArgumentAt(i)->value()->PrintTo(f);
+  }
+  if (can_skip_callee_type_checks()) {
+    f->Print(", skipping callee type checks");
   }
 }
 

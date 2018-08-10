@@ -648,6 +648,7 @@ class FunctionDeserializationCluster : public DeserializationCluster {
 
 #if defined(DEBUG)
       func->ptr()->entry_point_ = 0;
+      func->ptr()->entry_point_skipping_type_checks_ = 0;
 #endif
 
 #if !defined(DART_PRECOMPILED_RUNTIME)
@@ -686,6 +687,11 @@ class FunctionDeserializationCluster : public DeserializationCluster {
         uword entry_point = func.raw()->ptr()->code_->ptr()->entry_point_;
         ASSERT(entry_point != 0);
         func.raw()->ptr()->entry_point_ = entry_point;
+        uword entry_point_skipping_type_checks =
+            func.raw()->ptr()->code_->ptr()->entry_point_skipping_type_checks_;
+        ASSERT(entry_point_skipping_type_checks != 0);
+        func.raw()->ptr()->entry_point_skipping_type_checks_ =
+            entry_point_skipping_type_checks;
       }
     } else if (kind == Snapshot::kFullJIT) {
       Function& func = Function::Handle(zone);
@@ -1701,6 +1707,8 @@ class CodeSerializationCluster : public SerializationCluster {
         }
       }
 
+      s->Write<uword>(code->ptr()->entry_point_skipping_type_checks_pc_);
+
       s->WriteInstructions(code->ptr()->instructions_, code);
       if (s->kind() == Snapshot::kFullJIT) {
         // TODO(rmacnak): Fix references to disabled code before serializing.
@@ -1767,6 +1775,8 @@ class CodeDeserializationCluster : public DeserializationCluster {
       Deserializer::InitializeHeader(code, kCodeCid, Code::InstanceSize(0),
                                      is_vm_object);
 
+      code->ptr()->entry_point_skipping_type_checks_pc_ = d->Read<uword>();
+
       RawInstructions* instr = d->ReadInstructions();
 
       code->ptr()->entry_point_ = Instructions::EntryPoint(instr);
@@ -1774,6 +1784,9 @@ class CodeDeserializationCluster : public DeserializationCluster {
           Instructions::MonomorphicEntryPoint(instr);
       NOT_IN_PRECOMPILED(code->ptr()->active_instructions_ = instr);
       code->ptr()->instructions_ = instr;
+      code->ptr()->entry_point_skipping_type_checks_ =
+          Instructions::PayloadStart(instr) +
+          code->ptr()->entry_point_skipping_type_checks_pc_;
 
 #if !defined(DART_PRECOMPILED_RUNTIME)
       if (d->kind() == Snapshot::kFullJIT) {
@@ -1782,6 +1795,12 @@ class CodeDeserializationCluster : public DeserializationCluster {
         code->ptr()->entry_point_ = Instructions::EntryPoint(instr);
         code->ptr()->monomorphic_entry_point_ =
             Instructions::MonomorphicEntryPoint(instr);
+      // UNDONE(sjindel/entrypoints): We need to detect whether the code is
+      // disabled and make both entry-points point to the start of the active
+      // instructions in that case.
+        code->ptr()->entry_point_skipping_type_checks_ =
+            Instructions::PayloadStart(instr) +
+            code->ptr()->entry_point_skipping_type_checks_pc_;
       }
 #endif  // !DART_PRECOMPILED_RUNTIME
 

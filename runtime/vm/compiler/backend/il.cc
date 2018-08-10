@@ -1716,11 +1716,16 @@ BlockEntryInstr* Instruction::SuccessorAt(intptr_t index) const {
 }
 
 intptr_t GraphEntryInstr::SuccessorCount() const {
-  return 1 + catch_entries_.length();
+  return 1 + (entry_skipping_type_checks() == nullptr ? 0 : 1) +
+         catch_entries_.length();
 }
 
 BlockEntryInstr* GraphEntryInstr::SuccessorAt(intptr_t index) const {
   if (index == 0) return normal_entry_;
+  if (entry_skipping_type_checks() != nullptr) {
+    if (index == 1) return entry_skipping_type_checks();
+    return catch_entries_[index - 2];
+  }
   return catch_entries_[index - 1];
 }
 
@@ -3547,6 +3552,21 @@ LocationSummary* TargetEntryInstr::MakeLocationSummary(Zone* zone,
 
 void TargetEntryInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   __ Bind(compiler->GetJumpLabel(this));
+
+#if defined(TARGET_ARCH_X64) || defined(TARGET_ARCH_ARM)
+  // TODO(sjindel/entrypoints): Make the treatment of the alternate entry-point
+  // and the default entry-point more uniform so that edge-counters can
+  // determine the which entry-point's prologue comes first.
+  if (this ==
+          compiler->flow_graph().graph_entry()->entry_skipping_type_checks()) {
+    compiler->entry_point_skipping_type_checks = __ CodeSize();
+    __ set_constant_pool_allowed(false);
+    compiler->entry_point_skipping_type_checks = __ CodeSize();
+    compiler->EmitPrologue();
+    ASSERT(__ constant_pool_allowed());
+  }
+#endif
+
   if (!compiler->is_optimizing()) {
 #if !defined(TARGET_ARCH_DBC)
     // TODO(vegorov) re-enable edge counters on DBC if we consider them
@@ -3861,11 +3881,13 @@ void InstanceCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
       const ICData& unary_ic_data =
           ICData::ZoneHandle(zone, ic_data()->AsUnaryClassChecks());
       compiler->GenerateInstanceCall(deopt_id(), token_pos(), locs(),
-                                     unary_ic_data);
+                                     unary_ic_data,
+                                     can_skip_callee_type_checks());
     } else {
       // Call was not visited yet, use original ICData in order to populate it.
       compiler->GenerateInstanceCall(deopt_id(), token_pos(), locs(),
-                                     *call_ic_data);
+                                     *call_ic_data,
+                                     can_skip_callee_type_checks());
     }
   } else {
     // Unoptimized code.
@@ -4113,6 +4135,11 @@ LocationSummary* StaticCallInstr::MakeLocationSummary(Zone* zone,
 }
 
 void StaticCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
+  if (strstr(compiler->function().ToFullyQualifiedCString(), "HashMap") &&
+      strstr(compiler->function().ToFullyQualifiedCString(), "[]=") &&
+      strstr(function().ToCString(), "_addEntry")) {
+    // __ Breakpoint();
+  }
   Zone* zone = compiler->zone();
   const ICData* call_ic_data = NULL;
   if (!FLAG_propagate_ic_data || !compiler->is_optimizing() ||
@@ -4141,7 +4168,8 @@ void StaticCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
 #if !defined(TARGET_ARCH_DBC)
   ArgumentsInfo args_info(type_args_len(), ArgumentCount(), argument_names());
   compiler->GenerateStaticCall(deopt_id(), token_pos(), function(), args_info,
-                               locs(), *call_ic_data, rebind_rule_);
+                               locs(), *call_ic_data, rebind_rule_,
+                               can_skip_callee_type_checks());
   if (function().IsFactory()) {
     TypeUsageInfo* type_usage_info = compiler->thread()->type_usage_info();
     if (type_usage_info != nullptr) {

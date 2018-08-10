@@ -35,11 +35,13 @@ FlowGraphBuilder::FlowGraphBuilder(
     InlineExitCollector* exit_collector,
     bool optimizing,
     intptr_t osr_id,
-    intptr_t first_block_id)
+    intptr_t first_block_id,
+    bool skipping_type_checks)
     : BaseFlowGraphBuilder(parsed_function,
                            first_block_id - 1,
                            context_level_array,
-                           exit_collector),
+                           exit_collector,
+                           skipping_type_checks),
       translation_helper_(Thread::Current()),
       thread_(translation_helper_.thread()),
       zone_(translation_helper_.zone()),
@@ -412,13 +414,15 @@ Fragment FlowGraphBuilder::InstanceCall(
 
 Fragment FlowGraphBuilder::ClosureCall(intptr_t type_args_len,
                                        intptr_t argument_count,
-                                       const Array& argument_names) {
+                                       const Array& argument_names,
+                                       bool is_statically_checked) {
   Value* function = Pop();
   const intptr_t total_count = argument_count + (type_args_len > 0 ? 1 : 0);
   ArgumentArray arguments = GetArguments(total_count);
   ClosureCallInstr* call = new (Z)
       ClosureCallInstr(function, arguments, type_args_len, argument_names,
-                       TokenPosition::kNoSource, GetNextDeoptId());
+                       TokenPosition::kNoSource, GetNextDeoptId(),
+                       is_statically_checked);
   Push(call);
   return Fragment(call);
 }

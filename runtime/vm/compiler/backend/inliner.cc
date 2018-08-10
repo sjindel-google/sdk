@@ -17,6 +17,7 @@
 #include "vm/compiler/frontend/kernel_to_il.h"
 #include "vm/compiler/jit/compiler.h"
 #include "vm/compiler/jit/jit_call_specializer.h"
+#include "vm/compiler/compiler_pass.h"
 #include "vm/flags.h"
 #include "vm/kernel.h"
 #include "vm/longjump.h"
@@ -25,6 +26,8 @@
 #include "vm/timer.h"
 
 namespace dart {
+
+volatile int ctr = 0;
 
 DEFINE_FLAG(int,
             deoptimization_counter_inlining_threshold,
@@ -958,11 +961,23 @@ class CallSiteInliner : public ValueObject {
             new (Z) InlineExitCollector(caller_graph_, call);
         FlowGraph* callee_graph;
         if (UseKernelFrontEndFor(parsed_function)) {
+          bool skipping_type_checks = false;
+          if (StaticCallInstr* instr = call_data->call->AsStaticCall()) {
+            skipping_type_checks = instr->can_skip_callee_type_checks();
+          } else if (InstanceCallInstr* instr = call_data->call->AsInstanceCall()) {
+            skipping_type_checks = instr->can_skip_callee_type_checks();
+          } else if (PolymorphicInstanceCallInstr* instr =
+                         call_data->call->AsPolymorphicInstanceCall()) {
+            skipping_type_checks = instr->instance_call()->can_skip_callee_type_checks();
+          } else if (ClosureCallInstr* instr = call_data->call->AsClosureCall()) {
+            skipping_type_checks = instr->is_statically_checked_call();
+          }
           kernel::FlowGraphBuilder builder(
               parsed_function, *ic_data_array, /* not building var desc */ NULL,
               exit_collector,
               /* optimized = */ true, Compiler::kNoOSRDeoptId,
-              caller_graph_->max_block_id() + 1);
+              caller_graph_->max_block_id() + 1,
+              skipping_type_checks);
           {
             CSTAT_TIMER_SCOPE(thread(), graphinliner_build_timer);
             callee_graph = builder.BuildGraph();
@@ -1105,6 +1120,11 @@ class CallSiteInliner : public ValueObject {
             // before 'SelectRepresentations' which inserts conversion nodes.
             callee_graph->TryOptimizePatterns();
             DEBUG_ASSERT(callee_graph->VerifyUseLists());
+
+            // This optimization must be performed before inlining to ensure
+            // that the receiver of the function is detected (since it will just
+            // be some regular variable after inlining).
+            OptimizeTypeCheckedCalls(callee_graph);
 
             callee_graph->Canonicalize();
           }
@@ -1362,6 +1382,9 @@ class CallSiteInliner : public ValueObject {
       }
 
       const Function& target = call->function();
+      if (strstr(target.ToCString(), "samir1") != 0) {
+        ++ctr;
+      }
       if (!inliner_->AlwaysInline(target) &&
           (call_info[call_idx].ratio * 100) < FLAG_inlining_hotness) {
         if (trace_inlining()) {

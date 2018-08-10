@@ -388,6 +388,8 @@ class FlowGraphCompiler : public ValueObject {
 
   void CompileGraph();
 
+  void EmitPrologue();
+
   void VisitBlocks();
 
   // Bail out of the flow graph compiler. Does not return to the caller.
@@ -453,13 +455,16 @@ class FlowGraphCompiler : public ValueObject {
                         TokenPosition token_pos,
                         const StubEntry& stub_entry,
                         RawPcDescriptors::Kind kind,
-                        LocationSummary* locs);
+                        LocationSummary* locs,
+                        bool can_skip_callee_type_checks = false);
+
   void GenerateStaticDartCall(intptr_t deopt_id,
                               TokenPosition token_pos,
                               const StubEntry& stub_entry,
                               RawPcDescriptors::Kind kind,
                               LocationSummary* locs,
-                              const Function& target);
+                              const Function& target,
+                              bool can_skip_callee_type_checks = false);
 
   void GenerateInstanceOf(TokenPosition token_pos,
                           intptr_t deopt_id,
@@ -469,7 +474,8 @@ class FlowGraphCompiler : public ValueObject {
   void GenerateInstanceCall(intptr_t deopt_id,
                             TokenPosition token_pos,
                             LocationSummary* locs,
-                            const ICData& ic_data);
+                            const ICData& ic_data,
+                            bool can_skip_callee_type_checks = false);
 
   void GenerateStaticCall(intptr_t deopt_id,
                           TokenPosition token_pos,
@@ -477,7 +483,8 @@ class FlowGraphCompiler : public ValueObject {
                           ArgumentsInfo args_info,
                           LocationSummary* locs,
                           const ICData& ic_data_in,
-                          ICData::RebindRule rebind_rule);
+                          ICData::RebindRule rebind_rule,
+                          bool can_skip_callee_type_checks = false);
 
   void GenerateNumberTypeCheck(Register kClassIdReg,
                                const AbstractType& type,
@@ -514,7 +521,8 @@ class FlowGraphCompiler : public ValueObject {
                                  const ICData& ic_data,
                                  intptr_t deopt_id,
                                  TokenPosition token_pos,
-                                 LocationSummary* locs);
+                                 LocationSummary* locs,
+                                 bool can_skip_callee_type_checks = false);
 
   void EmitInstanceCall(const StubEntry& stub_entry,
                         const ICData& ic_data,
@@ -555,7 +563,8 @@ class FlowGraphCompiler : public ValueObject {
                        TokenPosition token_index,
                        LocationSummary* locs,
                        bool complete,
-                       intptr_t total_ic_calls);
+                       intptr_t total_ic_calls,
+                       bool can_skip_callee_type_checks = false);
 
   Condition EmitEqualityRegConstCompare(Register reg,
                                         const Object& obj,
@@ -640,6 +649,7 @@ class FlowGraphCompiler : public ValueObject {
 
   void AddSlowPathCode(SlowPathCode* slow_path);
 
+  void FinalizeEntryPoints(const Code& code);
   void FinalizeExceptionHandlers(const Code& code);
   void FinalizePcDescriptors(const Code& code);
   RawArray* CreateDeoptInfo(Assembler* assembler);
@@ -738,6 +748,8 @@ class FlowGraphCompiler : public ValueObject {
                                      int bias,
                                      bool jump_on_miss = true);
 
+  uword entry_point_skipping_type_checks = 0;
+
  private:
   friend class CheckStackOverflowSlowPath;  // For pending_deoptimization_env_.
   friend class CheckedSmiSlowPath;          // Same.
@@ -760,7 +772,8 @@ class FlowGraphCompiler : public ValueObject {
                                intptr_t count_with_type_args,
                                intptr_t deopt_id,
                                TokenPosition token_pos,
-                               LocationSummary* locs);
+                               LocationSummary* locs,
+                               bool can_skip_callee_type_checks = true);
 
   void EmitUnoptimizedStaticCall(intptr_t count_with_type_args,
                                  intptr_t deopt_id,

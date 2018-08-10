@@ -849,6 +849,8 @@ void FlowGraphCompiler::CompileGraph() {
   }
 #endif  // DART_PRECOMPILER
 
+  entry_point_skipping_type_checks = __ CodeSize();
+
   if (TryIntrinsify()) {
     // Skip regular code generation.
     return;
@@ -905,17 +907,22 @@ void FlowGraphCompiler::GenerateDartCall(intptr_t deopt_id,
                                          TokenPosition token_pos,
                                          const StubEntry& stub_entry,
                                          RawPcDescriptors::Kind kind,
-                                         LocationSummary* locs) {
+                                         LocationSummary* locs,
+                                         bool can_skip_callee_type_checks) {
+  // TODO(sjindel/entrypoints): Support multiple entrypoints on ARM64.
   __ BranchLinkPatchable(stub_entry);
   EmitCallsiteMetadata(token_pos, deopt_id, kind, locs);
 }
 
-void FlowGraphCompiler::GenerateStaticDartCall(intptr_t deopt_id,
-                                               TokenPosition token_pos,
-                                               const StubEntry& stub_entry,
-                                               RawPcDescriptors::Kind kind,
-                                               LocationSummary* locs,
-                                               const Function& target) {
+void FlowGraphCompiler::GenerateStaticDartCall(
+    intptr_t deopt_id,
+    TokenPosition token_pos,
+    const StubEntry& stub_entry,
+    RawPcDescriptors::Kind kind,
+    LocationSummary* locs,
+    const Function& target,
+    bool can_skip_callee_type_checks) {
+  // TODO(sjindel/entrypoints): Support multiple entrypoints on ARM64.
   // Call sites to the same target can share object pool entries. These
   // call sites are never patched for breakpoints: the function is deoptimized
   // and the unoptimized code with IC calls for static calls is patched instead.
@@ -949,11 +956,14 @@ void FlowGraphCompiler::EmitEdgeCounter(intptr_t edge_id) {
   __ StoreFieldToOffset(TMP, R0, Array::element_offset(edge_id));
 }
 
-void FlowGraphCompiler::EmitOptimizedInstanceCall(const StubEntry& stub_entry,
-                                                  const ICData& ic_data,
-                                                  intptr_t deopt_id,
-                                                  TokenPosition token_pos,
-                                                  LocationSummary* locs) {
+void FlowGraphCompiler::EmitOptimizedInstanceCall(
+    const StubEntry& stub_entry,
+    const ICData& ic_data,
+    intptr_t deopt_id,
+    TokenPosition token_pos,
+    LocationSummary* locs,
+    bool can_skip_callee_type_checks) {
+  // TODO(sjindel/entrypoints): Support multiple entrypoints on ARM64.
   ASSERT(Array::Handle(zone(), ic_data.arguments_descriptor()).Length() > 0);
   // Each ICData propagated from unoptimized to optimized code contains the
   // function that corresponds to the Dart function of that IC call. Due
@@ -1067,7 +1077,9 @@ void FlowGraphCompiler::EmitOptimizedStaticCall(
     intptr_t count_with_type_args,
     intptr_t deopt_id,
     TokenPosition token_pos,
-    LocationSummary* locs) {
+    LocationSummary* locs,
+    bool can_skip_callee_type_checks) {
+  // TODO(sjindel/entrypoints): Support multiple entrypoints on ARM64.
   ASSERT(!function.IsClosureFunction());
   if (function.HasOptionalParameters() ||
       (isolate()->reify_generic_functions() && function.IsGeneric())) {

@@ -60,12 +60,24 @@ class AnnotateWithStaticTypes extends RecursiveVisitor<Null> {
     env.thisType = null;
   }
 
+  static bool needsAnnotation(MethodInvocation node) {
+    if (node.interfaceTarget != null &&
+        hasGenericCovariantParameters(node.interfaceTarget)) {
+      return true;
+    }
+
+    if (node.name.name == "call") {
+      return true;
+    }
+
+    return false;
+  }
+
   @override
   visitMethodInvocation(MethodInvocation node) {
     super.visitMethodInvocation(node);
 
-    if (node.interfaceTarget != null &&
-        hasGenericCovariantParameters(node.interfaceTarget)) {
+    if (needsAnnotation(node)) {
       _metadata.mapping[node] = new CallSiteAttributesMetadata(receiverType: node.receiver.getStaticType(env));
     }
   }

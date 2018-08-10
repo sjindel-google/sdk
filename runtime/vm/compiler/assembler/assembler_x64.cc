@@ -61,26 +61,33 @@ void Assembler::call(const ExternalLabel* label) {
   call(TMP);
 }
 
-void Assembler::CallPatchable(const StubEntry& stub_entry) {
+void Assembler::CallPatchable(const StubEntry& stub_entry,
+                              bool can_skip_callee_type_checks) {
   ASSERT(constant_pool_allowed());
   const Code& target = Code::ZoneHandle(stub_entry.code());
   intptr_t call_start = buffer_.GetPosition();
   const intptr_t idx = object_pool_wrapper_.AddObject(target, kPatchable);
   const int32_t offset = ObjectPool::element_offset(idx);
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag);
-  movq(TMP, FieldAddress(CODE_REG, Code::entry_point_offset()));
+  movq(TMP,
+       FieldAddress(CODE_REG, Code::entry_point_skipping_type_checks_offset()));
   call(TMP);
   ASSERT((buffer_.GetPosition() - call_start) == kCallExternalLabelSize);
 }
 
 void Assembler::CallWithEquivalence(const StubEntry& stub_entry,
-                                    const Object& equivalence) {
+                                    const Object& equivalence,
+                                    bool can_skip_callee_type_checks) {
   ASSERT(constant_pool_allowed());
   const Code& target = Code::ZoneHandle(stub_entry.code());
   const intptr_t idx = object_pool_wrapper_.FindObject(target, equivalence);
   const int32_t offset = ObjectPool::element_offset(idx);
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag);
-  movq(TMP, FieldAddress(CODE_REG, Code::entry_point_offset()));
+  intptr_t entry_point_offset =
+      can_skip_callee_type_checks
+          ? Code::entry_point_skipping_type_checks_offset()
+          : Code::entry_point_offset();
+  movq(TMP, FieldAddress(CODE_REG, entry_point_offset));
   call(TMP);
 }
 

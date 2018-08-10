@@ -692,7 +692,8 @@ class Assembler : public ValueObject {
   void JmpPatchable(const StubEntry& stub_entry, Register pp);
   void Jmp(const StubEntry& stub_entry, Register pp = PP);
   void J(Condition condition, const StubEntry& stub_entry, Register pp);
-  void CallPatchable(const StubEntry& stub_entry);
+  void CallPatchable(const StubEntry& stub_entry,
+                     bool can_skip_callee_type_checks = false);
   void Call(const StubEntry& stub_entry);
   void CallToRuntime();
 
@@ -701,7 +702,9 @@ class Assembler : public ValueObject {
   // Emit a call that shares its object pool entries with other calls
   // that have the same equivalence marker.
   void CallWithEquivalence(const StubEntry& stub_entry,
-                           const Object& equivalence);
+                           const Object& equivalence,
+                           bool can_skip_callee_type_checks = false);
+
   // Unaware of write barrier (use StoreInto* methods for storing to objects).
   // TODO(koda): Add StackAddress/HeapAddress types to prevent misuse.
   void StoreObject(const Address& dst, const Object& obj);

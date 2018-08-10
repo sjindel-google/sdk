@@ -50,7 +50,8 @@ class FlowGraphBuilder : public BaseFlowGraphBuilder {
                    InlineExitCollector* exit_collector,
                    bool optimizing,
                    intptr_t osr_id,
-                   intptr_t first_block_id = 1);
+                   intptr_t first_block_id = 1,
+                   bool skipping_type_checks = false);
   virtual ~FlowGraphBuilder();
 
   FlowGraph* BuildGraph();
@@ -107,7 +108,8 @@ class FlowGraphBuilder : public BaseFlowGraphBuilder {
                         const InferredTypeMetadata* result_type = NULL);
   Fragment ClosureCall(intptr_t type_args_len,
                        intptr_t argument_count,
-                       const Array& argument_names);
+                       const Array& argument_names,
+                       bool is_statically_checked = false);
   Fragment RethrowException(TokenPosition position, int catch_try_index);
   Fragment LoadClassId();
   Fragment LoadField(intptr_t offset, intptr_t class_id = kDynamicCid);

@@ -620,9 +620,8 @@ void FlowGraphCompiler::GenerateInstanceOf(TokenPosition token_pos,
   Label done;
   if (!test_cache.IsNull()) {
     // Generate runtime call.
-    __ ldm(IA, SP,
-           (1 << kFunctionTypeArgumentsReg) |
-               (1 << kInstantiatorTypeArgumentsReg));
+    __ ldm(IA, SP, (1 << kFunctionTypeArgumentsReg) |
+                       (1 << kInstantiatorTypeArgumentsReg));
     __ PushObject(Object::null_object());  // Make room for the result.
     __ Push(R0);                           // Push the instance.
     __ PushObject(type);                   // Push the type.
@@ -714,9 +713,8 @@ void FlowGraphCompiler::GenerateAssertAssignable(TokenPosition token_pos,
                                           &runtime_call);
 
     __ Bind(&runtime_call);
-    __ ldm(IA, SP,
-           (1 << kFunctionTypeArgumentsReg) |
-               (1 << kInstantiatorTypeArgumentsReg));
+    __ ldm(IA, SP, (1 << kFunctionTypeArgumentsReg) |
+                       (1 << kInstantiatorTypeArgumentsReg));
     __ PushObject(Object::null_object());  // Make room for the result.
     __ Push(R0);                           // Push the source object.
     __ PushObject(dst_type);               // Push the type of the destination.
@@ -852,28 +850,7 @@ void FlowGraphCompiler::EmitFrameEntry() {
   }
 }
 
-// Input parameters:
-//   LR: return address.
-//   SP: address of last argument.
-//   FP: caller's frame pointer.
-//   PP: caller's pool pointer.
-//   R4: arguments descriptor array.
-void FlowGraphCompiler::CompileGraph() {
-  InitCompiler();
-#ifdef DART_PRECOMPILER
-  const Function& function = parsed_function().function();
-  if (function.IsDynamicFunction()) {
-    SpecialStatsBegin(CombinedCodeStatistics::kTagCheckedEntry);
-    __ MonomorphicCheckedEntry();
-    SpecialStatsEnd(CombinedCodeStatistics::kTagCheckedEntry);
-  }
-#endif  // DART_PRECOMPILER
-
-  if (TryIntrinsify()) {
-    // Skip regular code generation.
-    return;
-  }
-
+void FlowGraphCompiler::EmitPrologue() {
   EmitFrameEntry();
   ASSERT(assembler()->constant_pool_allowed());
 
@@ -898,6 +875,33 @@ void FlowGraphCompiler::CompileGraph() {
   }
 
   EndCodeSourceRange(TokenPosition::kDartCodePrologue);
+}
+
+// Input parameters:
+//   LR: return address.
+//   SP: address of last argument.
+//   FP: caller's frame pointer.
+//   PP: caller's pool pointer.
+//   R4: arguments descriptor array.
+void FlowGraphCompiler::CompileGraph() {
+  InitCompiler();
+#ifdef DART_PRECOMPILER
+  const Function& function = parsed_function().function();
+  if (function.IsDynamicFunction()) {
+    SpecialStatsBegin(CombinedCodeStatistics::kTagCheckedEntry);
+    __ MonomorphicCheckedEntry();
+    SpecialStatsEnd(CombinedCodeStatistics::kTagCheckedEntry);
+  }
+#endif  // DART_PRECOMPILER
+
+  entry_point_skipping_type_checks = __ CodeSize();
+
+  if (TryIntrinsify()) {
+    // Skip regular code generation.
+    return;
+  }
+
+  EmitPrologue();
   VisitBlocks();
 
   __ bkpt(0);
@@ -925,22 +929,25 @@ void FlowGraphCompiler::GenerateDartCall(intptr_t deopt_id,
                                          TokenPosition token_pos,
                                          const StubEntry& stub_entry,
                                          RawPcDescriptors::Kind kind,
-                                         LocationSummary* locs) {
-  __ BranchLinkPatchable(stub_entry);
+                                         LocationSummary* locs,
+                                         bool can_skip_callee_type_checks) {
+  __ BranchLinkPatchable(stub_entry, can_skip_callee_type_checks);
   EmitCallsiteMetadata(token_pos, deopt_id, kind, locs);
 }
 
-void FlowGraphCompiler::GenerateStaticDartCall(intptr_t deopt_id,
-                                               TokenPosition token_pos,
-                                               const StubEntry& stub_entry,
-                                               RawPcDescriptors::Kind kind,
-                                               LocationSummary* locs,
-                                               const Function& target) {
+void FlowGraphCompiler::GenerateStaticDartCall(
+    intptr_t deopt_id,
+    TokenPosition token_pos,
+    const StubEntry& stub_entry,
+    RawPcDescriptors::Kind kind,
+    LocationSummary* locs,
+    const Function& target,
+    bool can_skip_callee_type_checks) {
   // Call sites to the same target can share object pool entries. These
   // call sites are never patched for breakpoints: the function is deoptimized
   // and the unoptimized code with IC calls for static calls is patched instead.
   ASSERT(is_optimizing());
-  __ BranchLinkWithEquivalence(stub_entry, target);
+  __ BranchLinkWithEquivalence(stub_entry, target, can_skip_callee_type_checks);
   EmitCallsiteMetadata(token_pos, deopt_id, kind, locs);
   AddStaticCallTarget(target);
 }
@@ -976,11 +983,13 @@ void FlowGraphCompiler::EmitEdgeCounter(intptr_t edge_id) {
 #endif  // DEBUG
 }
 
-void FlowGraphCompiler::EmitOptimizedInstanceCall(const StubEntry& stub_entry,
-                                                  const ICData& ic_data,
-                                                  intptr_t deopt_id,
-                                                  TokenPosition token_pos,
-                                                  LocationSummary* locs) {
+void FlowGraphCompiler::EmitOptimizedInstanceCall(
+    const StubEntry& stub_entry,
+    const ICData& ic_data,
+    intptr_t deopt_id,
+    TokenPosition token_pos,
+    LocationSummary* locs,
+    bool can_skip_callee_type_checks) {
   ASSERT(Array::Handle(zone(), ic_data.arguments_descriptor()).Length() > 0);
   // Each ICData propagated from unoptimized to optimized code contains the
   // function that corresponds to the Dart function of that IC call. Due
@@ -992,7 +1001,7 @@ void FlowGraphCompiler::EmitOptimizedInstanceCall(const StubEntry& stub_entry,
   __ LoadObject(R8, parsed_function().function());
   __ LoadUniqueObject(R9, ic_data);
   GenerateDartCall(deopt_id, token_pos, stub_entry, RawPcDescriptors::kIcCall,
-                   locs);
+                   locs, can_skip_callee_type_checks);
   __ Drop(ic_data.CountWithTypeArgs());
 }
 
@@ -1094,7 +1103,8 @@ void FlowGraphCompiler::EmitOptimizedStaticCall(
     intptr_t count_with_type_args,
     intptr_t deopt_id,
     TokenPosition token_pos,
-    LocationSummary* locs) {
+    LocationSummary* locs,
+    bool can_skip_callee_type_checks) {
   ASSERT(!function.IsClosureFunction());
   if (function.HasOptionalParameters() ||
       (isolate()->reify_generic_functions() && function.IsGeneric())) {
@@ -1104,9 +1114,9 @@ void FlowGraphCompiler::EmitOptimizedStaticCall(
   }
   // Do not use the code from the function, but let the code be patched so that
   // we can record the outgoing edges to other code.
-  GenerateStaticDartCall(deopt_id, token_pos,
-                         *StubCode::CallStaticFunction_entry(),
-                         RawPcDescriptors::kOther, locs, function);
+  GenerateStaticDartCall(
+      deopt_id, token_pos, *StubCode::CallStaticFunction_entry(),
+      RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
   __ Drop(count_with_type_args);
 }
 
