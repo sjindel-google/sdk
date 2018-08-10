@@ -1794,12 +1794,10 @@ class CodeDeserializationCluster : public DeserializationCluster {
         code->ptr()->entry_point_ = Instructions::EntryPoint(instr);
         code->ptr()->monomorphic_entry_point_ =
             Instructions::MonomorphicEntryPoint(instr);
-        // UNDONE(sjindel/entrypoints): We need to detect whether the code is
-        // disabled and make both entry-points point to the start of the active
-        // instructions in that case.
-        code->ptr()->unchecked_entry_point_ =
-            Instructions::PayloadStart(instr) +
-            code->ptr()->unchecked_entrypoint_pc_offset_;
+        if (code->ptr()->active_instructions_ != code->ptr()->instructions_) {
+          // Code is disabled so the unchecked entry-point offset is unusable.
+          code->ptr()->unchecked_entry_point_ = code->ptr()->entry_point_;
+        }
       }
 #endif  // !DART_PRECOMPILED_RUNTIME
 
