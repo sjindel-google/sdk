@@ -456,7 +456,7 @@ class FlowGraphCompiler : public ValueObject {
                         const StubEntry& stub_entry,
                         RawPcDescriptors::Kind kind,
                         LocationSummary* locs,
-                        bool can_skip_callee_type_checks = false);
+                        bool use_unchecked_entry = false);
 
   void GenerateStaticDartCall(intptr_t deopt_id,
                               TokenPosition token_pos,
@@ -464,7 +464,7 @@ class FlowGraphCompiler : public ValueObject {
                               RawPcDescriptors::Kind kind,
                               LocationSummary* locs,
                               const Function& target,
-                              bool can_skip_callee_type_checks = false);
+                              bool use_unchecked_entry = false);
 
   void GenerateInstanceOf(TokenPosition token_pos,
                           intptr_t deopt_id,
@@ -475,7 +475,7 @@ class FlowGraphCompiler : public ValueObject {
                             TokenPosition token_pos,
                             LocationSummary* locs,
                             const ICData& ic_data,
-                            bool can_skip_callee_type_checks = false);
+                            bool use_unchecked_entry = false);
 
   void GenerateStaticCall(intptr_t deopt_id,
                           TokenPosition token_pos,
@@ -484,7 +484,7 @@ class FlowGraphCompiler : public ValueObject {
                           LocationSummary* locs,
                           const ICData& ic_data_in,
                           ICData::RebindRule rebind_rule,
-                          bool can_skip_callee_type_checks = false);
+                          bool use_unchecked_entry = false);
 
   void GenerateNumberTypeCheck(Register kClassIdReg,
                                const AbstractType& type,
@@ -522,7 +522,7 @@ class FlowGraphCompiler : public ValueObject {
                                  intptr_t deopt_id,
                                  TokenPosition token_pos,
                                  LocationSummary* locs,
-                                 bool can_skip_callee_type_checks = false);
+                                 bool use_unchecked_entry = false);
 
   void EmitInstanceCall(const StubEntry& stub_entry,
                         const ICData& ic_data,
@@ -564,7 +564,7 @@ class FlowGraphCompiler : public ValueObject {
                        LocationSummary* locs,
                        bool complete,
                        intptr_t total_ic_calls,
-                       bool can_skip_callee_type_checks = false);
+                       bool use_unchecked_entry = false);
 
   Condition EmitEqualityRegConstCompare(Register reg,
                                         const Object& obj,
@@ -773,7 +773,7 @@ class FlowGraphCompiler : public ValueObject {
                                intptr_t deopt_id,
                                TokenPosition token_pos,
                                LocationSummary* locs,
-                               bool can_skip_callee_type_checks = true);
+                               bool use_unchecked_entry = true);
 
   void EmitUnoptimizedStaticCall(intptr_t count_with_type_args,
                                  intptr_t deopt_id,

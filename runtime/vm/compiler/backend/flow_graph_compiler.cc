@@ -1148,7 +1148,7 @@ void FlowGraphCompiler::GenerateInstanceCall(intptr_t deopt_id,
                                              TokenPosition token_pos,
                                              LocationSummary* locs,
                                              const ICData& ic_data_in,
-                                             bool can_skip_callee_type_checks) {
+                                             bool use_unchecked_entry) {
   ICData& ic_data = ICData::ZoneHandle(ic_data_in.Original());
   if (FLAG_precompiled_mode) {
     ic_data = ic_data.AsUnaryClassChecks();
@@ -1207,7 +1207,7 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
                                            LocationSummary* locs,
                                            const ICData& ic_data_in,
                                            ICData::RebindRule rebind_rule,
-                                           bool can_skip_callee_type_checks) {
+                                           bool use_unchecked_entry) {
   const ICData& ic_data = ICData::ZoneHandle(ic_data_in.Original());
   const Array& arguments_descriptor = Array::ZoneHandle(
       zone(), ic_data.IsNull() ? args_info.ToArgumentsDescriptor()
@@ -1217,7 +1217,7 @@ void FlowGraphCompiler::GenerateStaticCall(intptr_t deopt_id,
   if (is_optimizing()) {
     EmitOptimizedStaticCall(function, arguments_descriptor,
                             args_info.count_with_type_args, deopt_id, token_pos,
-                            locs, can_skip_callee_type_checks);
+                            locs, use_unchecked_entry);
   } else {
     ICData& call_ic_data = ICData::ZoneHandle(zone(), ic_data.raw());
     if (call_ic_data.IsNull()) {
@@ -1835,7 +1835,7 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
                                         LocationSummary* locs,
                                         bool complete,
                                         intptr_t total_ic_calls,
-                                        bool can_skip_callee_type_checks) {
+                                        bool use_unchecked_entry) {
   ASSERT(is_optimizing());
 
   const Array& arguments_descriptor =
@@ -1879,7 +1879,7 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
     const Function& function = *targets.TargetAt(smi_case)->target;
     GenerateStaticDartCall(
         deopt_id, token_index, *StubCode::CallStaticFunction_entry(),
-        RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
+        RawPcDescriptors::kOther, locs, function, use_unchecked_entry);
     __ Drop(args_info.count_with_type_args);
     if (match_found != NULL) {
       __ Jump(match_found);
@@ -1930,7 +1930,7 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
     const Function& function = *targets.TargetAt(i)->target;
     GenerateStaticDartCall(
         deopt_id, token_index, *StubCode::CallStaticFunction_entry(),
-        RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
+        RawPcDescriptors::kOther, locs, function, use_unchecked_entry);
     __ Drop(args_info.count_with_type_args);
     if (!is_last_check || add_megamorphic_call) {
       __ Jump(match_found);

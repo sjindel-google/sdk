@@ -693,7 +693,7 @@ class Assembler : public ValueObject {
   void Jmp(const StubEntry& stub_entry, Register pp = PP);
   void J(Condition condition, const StubEntry& stub_entry, Register pp);
   void CallPatchable(const StubEntry& stub_entry,
-                     bool can_skip_callee_type_checks = false);
+                     bool use_unchecked_entry = false);
   void Call(const StubEntry& stub_entry);
   void CallToRuntime();
 
@@ -703,7 +703,7 @@ class Assembler : public ValueObject {
   // that have the same equivalence marker.
   void CallWithEquivalence(const StubEntry& stub_entry,
                            const Object& equivalence,
-                           bool can_skip_callee_type_checks = false);
+                           bool use_unchecked_entry = false);
 
   // Unaware of write barrier (use StoreInto* methods for storing to objects).
   // TODO(koda): Add StackAddress/HeapAddress types to prevent misuse.

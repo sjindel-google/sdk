@@ -2456,7 +2456,7 @@ void Assembler::Branch(const StubEntry& stub_entry,
 
 void Assembler::BranchLink(const Code& target,
                            Patchability patchable,
-                           bool can_skip_callee_type_checks) {
+                           bool use_unchecked_entry) {
   // Make sure that class CallPattern is able to patch the label referred
   // to by this code sequence.
   // For added code robustness, use 'blx lr' in a patchable sequence and
@@ -2464,7 +2464,7 @@ void Assembler::BranchLink(const Code& target,
   const int32_t offset = ObjectPool::element_offset(
       object_pool_wrapper_.FindObject(target, patchable));
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag, PP, AL);
-  intptr_t entry_point = can_skip_callee_type_checks
+  intptr_t entry_point = use_unchecked_entry
                              ? Code::unchecked_entry_point_offset()
                              : Code::entry_point_offset();
   ldr(LR, FieldAddress(CODE_REG, entry_point));
@@ -2478,8 +2478,8 @@ void Assembler::BranchLink(const StubEntry& stub_entry,
 }
 
 void Assembler::BranchLinkPatchable(const Code& target,
-                                    bool can_skip_callee_type_checks) {
-  BranchLink(target, kPatchable, can_skip_callee_type_checks);
+                                    bool use_unchecked_entry) {
+  BranchLink(target, kPatchable, use_unchecked_entry);
 }
 
 void Assembler::BranchLinkToRuntime() {
@@ -2499,7 +2499,7 @@ void Assembler::CallNullErrorShared(bool save_fpu_registers) {
 
 void Assembler::BranchLinkWithEquivalence(const StubEntry& stub_entry,
                                           const Object& equivalence,
-                                          bool can_skip_callee_type_checks) {
+                                          bool use_unchecked_entry) {
   const Code& target = Code::ZoneHandle(stub_entry.code());
   // Make sure that class CallPattern is able to patch the label referred
   // to by this code sequence.
@@ -2508,7 +2508,7 @@ void Assembler::BranchLinkWithEquivalence(const StubEntry& stub_entry,
   const int32_t offset = ObjectPool::element_offset(
       object_pool_wrapper_.FindObject(target, equivalence));
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag, PP, AL);
-  intptr_t entry_point = can_skip_callee_type_checks
+  intptr_t entry_point = use_unchecked_entry
                              ? Code::unchecked_entry_point_offset()
                              : Code::entry_point_offset();
   ldr(LR, FieldAddress(CODE_REG, entry_point));
@@ -2520,8 +2520,8 @@ void Assembler::BranchLink(const ExternalLabel* label) {
   blx(LR);  // Use blx instruction so that the return branch prediction works.
 }
 
-void Assembler::BranchLinkPatchable(const StubEntry& stub_entry, bool can_skip_callee_type_checks) {
-  BranchLinkPatchable(Code::ZoneHandle(stub_entry.code()), can_skip_callee_type_checks);
+void Assembler::BranchLinkPatchable(const StubEntry& stub_entry, bool use_unchecked_entry) {
+  BranchLinkPatchable(Code::ZoneHandle(stub_entry.code()), use_unchecked_entry);
 }
 
 void Assembler::BranchLinkOffset(Register base, int32_t offset) {

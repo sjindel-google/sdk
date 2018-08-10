@@ -62,7 +62,7 @@ void Assembler::call(const ExternalLabel* label) {
 }
 
 void Assembler::CallPatchable(const StubEntry& stub_entry,
-                              bool can_skip_callee_type_checks) {
+                              bool use_unchecked_entry) {
   ASSERT(constant_pool_allowed());
   const Code& target = Code::ZoneHandle(stub_entry.code());
   intptr_t call_start = buffer_.GetPosition();
@@ -77,14 +77,14 @@ void Assembler::CallPatchable(const StubEntry& stub_entry,
 
 void Assembler::CallWithEquivalence(const StubEntry& stub_entry,
                                     const Object& equivalence,
-                                    bool can_skip_callee_type_checks) {
+                                    bool use_unchecked_entry) {
   ASSERT(constant_pool_allowed());
   const Code& target = Code::ZoneHandle(stub_entry.code());
   const intptr_t idx = object_pool_wrapper_.FindObject(target, equivalence);
   const int32_t offset = ObjectPool::element_offset(idx);
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag);
   intptr_t entry_point_offset =
-      can_skip_callee_type_checks
+      use_unchecked_entry
           ? Code::unchecked_entry_point_offset()
           : Code::entry_point_offset();
   movq(TMP, FieldAddress(CODE_REG, entry_point_offset));

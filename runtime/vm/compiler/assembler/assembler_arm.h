@@ -698,22 +698,22 @@ class Assembler : public ValueObject {
                   Patchability patchable = kNotPatchable);
   void BranchLink(const Code& code,
                   Patchability patchable,
-                  bool can_skip_callee_type_checks = false);
+                  bool use_unchecked_entry = false);
   void BranchLinkToRuntime();
 
   void CallNullErrorShared(bool save_fpu_registers);
 
   // Branch and link to an entry address. Call sequence can be patched.
   void BranchLinkPatchable(const StubEntry& stub_entry,
-                           bool can_skip_callee_type_checks = false);
+                           bool use_unchecked_entry = false);
   void BranchLinkPatchable(const Code& code,
-                           bool can_skip_callee_type_checks = false);
+                           bool use_unchecked_entry = false);
 
   // Emit a call that shares its object pool entries with other calls
   // that have the same equivalence marker.
   void BranchLinkWithEquivalence(const StubEntry& stub_entry,
                                  const Object& equivalence,
-                                 bool can_skip_callee_type_checks = false);
+                                 bool use_unchecked_entry = false);
 
   // Branch and link to [base + offset]. Call sequence is never patched.
   void BranchLinkOffset(Register base, int32_t offset);

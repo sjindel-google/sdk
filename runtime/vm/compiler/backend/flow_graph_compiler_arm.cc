@@ -930,8 +930,8 @@ void FlowGraphCompiler::GenerateDartCall(intptr_t deopt_id,
                                          const StubEntry& stub_entry,
                                          RawPcDescriptors::Kind kind,
                                          LocationSummary* locs,
-                                         bool can_skip_callee_type_checks) {
-  __ BranchLinkPatchable(stub_entry, can_skip_callee_type_checks);
+                                         bool use_unchecked_entry) {
+  __ BranchLinkPatchable(stub_entry, use_unchecked_entry);
   EmitCallsiteMetadata(token_pos, deopt_id, kind, locs);
 }
 
@@ -942,12 +942,12 @@ void FlowGraphCompiler::GenerateStaticDartCall(
     RawPcDescriptors::Kind kind,
     LocationSummary* locs,
     const Function& target,
-    bool can_skip_callee_type_checks) {
+    bool use_unchecked_entry) {
   // Call sites to the same target can share object pool entries. These
   // call sites are never patched for breakpoints: the function is deoptimized
   // and the unoptimized code with IC calls for static calls is patched instead.
   ASSERT(is_optimizing());
-  __ BranchLinkWithEquivalence(stub_entry, target, can_skip_callee_type_checks);
+  __ BranchLinkWithEquivalence(stub_entry, target, use_unchecked_entry);
   EmitCallsiteMetadata(token_pos, deopt_id, kind, locs);
   AddStaticCallTarget(target);
 }
@@ -989,7 +989,7 @@ void FlowGraphCompiler::EmitOptimizedInstanceCall(
     intptr_t deopt_id,
     TokenPosition token_pos,
     LocationSummary* locs,
-    bool can_skip_callee_type_checks) {
+    bool use_unchecked_entry) {
   ASSERT(Array::Handle(zone(), ic_data.arguments_descriptor()).Length() > 0);
   // Each ICData propagated from unoptimized to optimized code contains the
   // function that corresponds to the Dart function of that IC call. Due
@@ -1001,7 +1001,7 @@ void FlowGraphCompiler::EmitOptimizedInstanceCall(
   __ LoadObject(R8, parsed_function().function());
   __ LoadUniqueObject(R9, ic_data);
   GenerateDartCall(deopt_id, token_pos, stub_entry, RawPcDescriptors::kIcCall,
-                   locs, can_skip_callee_type_checks);
+                   locs, use_unchecked_entry);
   __ Drop(ic_data.CountWithTypeArgs());
 }
 
@@ -1104,7 +1104,7 @@ void FlowGraphCompiler::EmitOptimizedStaticCall(
     intptr_t deopt_id,
     TokenPosition token_pos,
     LocationSummary* locs,
-    bool can_skip_callee_type_checks) {
+    bool use_unchecked_entry) {
   ASSERT(!function.IsClosureFunction());
   if (function.HasOptionalParameters() ||
       (isolate()->reify_generic_functions() && function.IsGeneric())) {
@@ -1116,7 +1116,7 @@ void FlowGraphCompiler::EmitOptimizedStaticCall(
   // we can record the outgoing edges to other code.
   GenerateStaticDartCall(
       deopt_id, token_pos, *StubCode::CallStaticFunction_entry(),
-      RawPcDescriptors::kOther, locs, function, can_skip_callee_type_checks);
+      RawPcDescriptors::kOther, locs, function, use_unchecked_entry);
   __ Drop(count_with_type_args);
 }
 
