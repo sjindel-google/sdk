@@ -15265,7 +15265,8 @@ class CodeCommentsWrapper final : public CodeComments {
 RawCode* Code::FinalizeCode(const char* name,
                             Assembler* assembler,
                             bool optimized,
-                            CodeStatistics* stats /* = nullptr */) {
+                            CodeStatistics* stats /* = nullptr */,
+                            uword unchecked_entry_pc_offset) {
   Isolate* isolate = Isolate::Current();
   if (!isolate->compilation_allowed()) {
     FATAL1("Precompilation missed code %s\n", name);
@@ -15330,6 +15331,7 @@ RawCode* Code::FinalizeCode(const char* name,
     }
 
     // Hook up Code and Instructions objects.
+    code.set_unchecked_entrypoint_pc_offset(unchecked_entry_pc_offset);
     code.SetActiveInstructions(instrs);
     code.set_instructions(instrs);
     code.set_is_alive(true);
@@ -15361,16 +15363,17 @@ RawCode* Code::FinalizeCode(const char* name,
 RawCode* Code::FinalizeCode(const Function& function,
                             Assembler* assembler,
                             bool optimized /* = false */,
-                            CodeStatistics* stats /* = nullptr */) {
+                            CodeStatistics* stats /* = nullptr */,
+                            uword unchecked_entrypoint_pc_offset) {
 // Calling ToLibNamePrefixedQualifiedCString is very expensive,
 // try to avoid it.
 #ifndef PRODUCT
   if (CodeObservers::AreActive()) {
     return FinalizeCode(function.ToLibNamePrefixedQualifiedCString(), assembler,
-                        optimized, stats);
+                        optimized, stats, unchecked_entrypoint_pc_offset);
   }
 #endif  // !PRODUCT
-  return FinalizeCode("", assembler, optimized, stats);
+  return FinalizeCode("", assembler, optimized, stats, unchecked_entrypoint_pc_offset);
 }
 #endif  // !defined(DART_PRECOMPILED_RUNTIME)
 

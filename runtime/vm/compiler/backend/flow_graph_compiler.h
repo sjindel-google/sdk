@@ -649,7 +649,6 @@ class FlowGraphCompiler : public ValueObject {
 
   void AddSlowPathCode(SlowPathCode* slow_path);
 
-  void FinalizeEntryPoints(const Code& code);
   void FinalizeExceptionHandlers(const Code& code);
   void FinalizePcDescriptors(const Code& code);
   RawArray* CreateDeoptInfo(Assembler* assembler);

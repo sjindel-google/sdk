@@ -911,13 +911,6 @@ void FlowGraphCompiler::EmitDeopt(intptr_t deopt_id,
 }
 #endif  // defined(TARGET_ARCH_DBC)
 
-void FlowGraphCompiler::FinalizeEntryPoints(const Code& code) {
-  code.set_unchecked_entrypoint_pc_offset(unchecked_entrypoint_pc_offset);
-  code.set_unchecked_entry_point(
-      Instructions::Handle(code.instructions()).PayloadStart() +
-      unchecked_entrypoint_pc_offset);
-}
-
 void FlowGraphCompiler::FinalizeExceptionHandlers(const Code& code) {
   ASSERT(exception_handlers_list_ != NULL);
   const ExceptionHandlers& handlers = ExceptionHandlers::Handle(

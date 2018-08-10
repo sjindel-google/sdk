@@ -603,8 +603,9 @@ RawCode* CompileParsedFunctionHelper::FinalizeCompilation(
            deopt_info_array.Length() * sizeof(uword));
   // Allocates instruction object. Since this occurs only at safepoint,
   // there can be no concurrent access to the instruction page.
-  Code& code =
-      Code::Handle(Code::FinalizeCode(function, assembler, optimized()));
+  Code& code = Code::Handle(
+      Code::FinalizeCode(function, assembler, optimized(), /*stats=*/nullptr,
+                         graph_compiler->unchecked_entrypoint_pc_offset));
   code.set_is_optimized(optimized());
   code.set_owner(function);
 #if !defined(PRODUCT)
@@ -647,7 +648,6 @@ RawCode* CompileParsedFunctionHelper::FinalizeCompilation(
   graph_compiler->FinalizeCatchEntryStateMap(code);
   graph_compiler->FinalizeStaticCallTargetsTable(code);
   graph_compiler->FinalizeCodeSourceMap(code);
-  graph_compiler->FinalizeEntryPoints(code);
 
   if (optimized()) {
     // Installs code while at safepoint.

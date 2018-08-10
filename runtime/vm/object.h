@@ -5098,11 +5098,13 @@ class Code : public Object {
   static RawCode* FinalizeCode(const Function& function,
                                Assembler* assembler,
                                bool optimized = false,
-                               CodeStatistics* stats = nullptr);
+                               CodeStatistics* stats = nullptr,
+                               uword unchecked_entry_pc_offset = 0);
   static RawCode* FinalizeCode(const char* name,
                                Assembler* assembler,
                                bool optimized,
-                               CodeStatistics* stats = nullptr);
+                               CodeStatistics* stats = nullptr,
+                               uword unchecked_entry_pc_offset = 0);
 #if defined(DART_USE_INTERPRETER)
   static RawCode* FinalizeBytecode(const void* bytecode_data,
                                    intptr_t bytecode_size,
