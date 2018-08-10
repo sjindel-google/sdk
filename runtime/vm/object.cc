@@ -5930,8 +5930,8 @@ void Function::SetInstructions(const Code& value) const {
 void Function::SetInstructionsSafe(const Code& value) const {
   StorePointer(&raw_ptr()->code_, value.raw());
   StoreNonPointer(&raw_ptr()->entry_point_, value.EntryPoint());
-  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
-                  value.entry_point_skipping_type_checks());
+  StoreNonPointer(&raw_ptr()->unchecked_entry_point_,
+                  value.unchecked_entry_point());
 }
 
 void Function::AttachCode(const Code& value) const {
@@ -8266,7 +8266,7 @@ RawCode* Function::EnsureHasCode() const {
   return CurrentCode();
 }
 
-bool Function::MayHaveEntryPointSkippingTypeChecks(Isolate* I) const {
+bool Function::MayHaveUncheckedEntryPoint(Isolate* I) const {
 #if defined(TARGET_ARCH_X64) || defined(TARGET_ARCH_ARM)
   return NeedsArgumentTypeChecks(I) || IsImplicitClosureFunction();
 #else
@@ -15233,7 +15233,7 @@ RawCode* Code::New(intptr_t pointer_offsets_length) {
     result.set_comments(Comments::New(0));
     result.set_compile_timestamp(0);
     result.set_pc_descriptors(Object::empty_descriptors());
-    result.set_entry_point_skipping_type_checks_pc(0);
+    result.set_unchecked_entrypoint_pc_offset(0);
   }
   return result.raw();
 }
@@ -15398,8 +15398,8 @@ RawCode* Code::FinalizeBytecode(const void* bytecode_data,
 
   // TODO(regis): Keep following lines or not?
   code.set_compile_timestamp(OS::GetCurrentMonotonicMicros());
-  // TODO(regis): Do we need to notify CodeObservers for bytecode too?
-  // If so, provide a better name using ToLibNamePrefixedQualifiedCString().
+// TODO(regis): Do we need to notify CodeObservers for bytecode too?
+// If so, provide a better name using ToLibNamePrefixedQualifiedCString().
 #ifndef PRODUCT
   CodeObservers::NotifyAll("bytecode", instrs.PayloadStart(),
                            0 /* prologue_offset */, instrs.Size(),
@@ -15580,8 +15580,7 @@ void Code::DisableDartCode() const {
   const Code& new_code =
       Code::Handle(StubCode::FixCallersTarget_entry()->code());
   SetActiveInstructions(Instructions::Handle(new_code.instructions()));
-  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
-                  raw_ptr()->entry_point_);
+  StoreNonPointer(&raw_ptr()->unchecked_entry_point_, raw_ptr()->entry_point_);
 }
 
 void Code::DisableStubCode() const {
@@ -15592,8 +15591,7 @@ void Code::DisableStubCode() const {
   const Code& new_code =
       Code::Handle(StubCode::FixAllocationStubTarget_entry()->code());
   SetActiveInstructions(Instructions::Handle(new_code.instructions()));
-  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
-                  raw_ptr()->entry_point_);
+  StoreNonPointer(&raw_ptr()->unchecked_entry_point_, raw_ptr()->entry_point_);
 #else
   // DBC does not use allocation stubs.
   UNIMPLEMENTED();
@@ -15612,9 +15610,9 @@ void Code::SetActiveInstructions(const Instructions& instructions) const {
                   Instructions::EntryPoint(instructions.raw()));
   StoreNonPointer(&raw_ptr()->monomorphic_entry_point_,
                   Instructions::MonomorphicEntryPoint(instructions.raw()));
-  StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_,
-                  instructions.PayloadStart() +
-                  raw_ptr()->entry_point_skipping_type_checks_pc_);
+  StoreNonPointer(
+      &raw_ptr()->unchecked_entry_point_,
+      instructions.PayloadStart() + raw_ptr()->unchecked_entrypoint_pc_offset_);
 #endif
 }
 

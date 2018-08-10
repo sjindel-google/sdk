@@ -2465,8 +2465,8 @@ void Assembler::BranchLink(const Code& target,
       object_pool_wrapper_.FindObject(target, patchable));
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag, PP, AL);
   intptr_t entry_point = can_skip_callee_type_checks
-                        ? Code::entry_point_skipping_type_checks_offset()
-                        : Code::entry_point_offset();
+                             ? Code::unchecked_entry_point_offset()
+                             : Code::entry_point_offset();
   ldr(LR, FieldAddress(CODE_REG, entry_point));
   blx(LR);  // Use blx instruction so that the return branch prediction works.
 }
@@ -2509,8 +2509,8 @@ void Assembler::BranchLinkWithEquivalence(const StubEntry& stub_entry,
       object_pool_wrapper_.FindObject(target, equivalence));
   LoadWordFromPoolOffset(CODE_REG, offset - kHeapObjectTag, PP, AL);
   intptr_t entry_point = can_skip_callee_type_checks
-                        ? Code::entry_point_skipping_type_checks_offset()
-                        : Code::entry_point_offset();
+                             ? Code::unchecked_entry_point_offset()
+                             : Code::entry_point_offset();
   ldr(LR, FieldAddress(CODE_REG, entry_point));
   blx(LR);  // Use blx instruction so that the return branch prediction works.
 }

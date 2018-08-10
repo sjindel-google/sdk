@@ -1645,7 +1645,7 @@ StreamingFlowGraphBuilder::ChooseEntryPointStyle(
     const Fragment& first_time_prologue,
     const Fragment& every_time_prologue) {
   ASSERT(!dart_function.IsImplicitClosureFunction());
-  if (!dart_function.MayHaveEntryPointSkippingTypeChecks(I) ||
+  if (!dart_function.MayHaveUncheckedEntryPoint(I) ||
       implicit_type_checks.is_empty() ||
       // TODO(sjindel/entrypoints): Enable multiple-entrypoints for AOT if we
       // consider them beneficial.

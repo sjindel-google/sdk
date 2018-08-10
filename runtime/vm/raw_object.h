@@ -901,7 +901,7 @@ class RawFunction : public RawObject {
   static bool CheckUsageCounter(RawFunction* raw_fun);
 
   uword entry_point_;  // Accessed from generated code.
-  uword entry_point_skipping_type_checks_;  // Accessed from generated code.
+  uword unchecked_entry_point_;  // Accessed from generated code.
 
   VISIT_FROM(RawObject*, name_);
   RawString* name_;
@@ -1289,9 +1289,9 @@ class RawCode : public RawObject {
   // In many cases a distinct static entry-point will not be created for a
   // function if it would not be able to skip a lot of work (e.g., no argument
   // type checks are necessary or this Code belongs to a stub). In this case
-  // 'entry_point_skipping_type_checks_' will refer to the same position as
-  // 'entry_point_'.
-  uword entry_point_skipping_type_checks_;  // Accessed from generated code.
+  // 'unchecked_entry_point_' will refer to the same position as 'entry_point_'.
+  //
+  uword unchecked_entry_point_;  // Accessed from generated code.
 
   VISIT_FROM(RawObject*, object_pool_);
   RawObjectPool* object_pool_;     // Accessed from generated code.
@@ -1334,7 +1334,7 @@ class RawCode : public RawObject {
   // Alive: If true, the embedded object pointers will be visited during GC.
   int32_t state_bits_;
 
-  uword entry_point_skipping_type_checks_pc_;
+  uword unchecked_entrypoint_pc_offset_;
 
   // Variable length data follows here.
   int32_t* data() { OPEN_ARRAY_START(int32_t, int32_t); }

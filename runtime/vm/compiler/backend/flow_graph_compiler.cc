@@ -266,9 +266,9 @@ bool FlowGraphCompiler::ForceSlowPathForStackOverflow() const {
 }
 
 static bool IsEmptyBlock(BlockEntryInstr* block) {
-  // Alternate entry-points cannot be merged because they must have assembly
+  // Unchecked entry-points cannot be merged because they must have assembly
   // prologue emitted which should not be included in any block they jump to.
-  const bool is_entry_point_skipping_type_checks =
+  const bool is_unchecked_entrypoint =
       block->PredecessorCount() == 1 &&
       block->PredecessorAt(0)->IsGraphEntry() &&
       block ==
@@ -276,7 +276,7 @@ static bool IsEmptyBlock(BlockEntryInstr* block) {
   return !block->IsCatchBlockEntry() && !block->HasNonRedundantParallelMove() &&
          block->next()->IsGoto() &&
          !block->next()->AsGoto()->HasNonRedundantParallelMove() &&
-         !block->IsIndirectEntry() && !is_entry_point_skipping_type_checks;
+         !block->IsIndirectEntry() && !is_unchecked_entrypoint;
 }
 
 void FlowGraphCompiler::CompactBlock(BlockEntryInstr* block) {
@@ -913,9 +913,8 @@ void FlowGraphCompiler::EmitDeopt(intptr_t deopt_id,
 #endif  // defined(TARGET_ARCH_DBC)
 
 void FlowGraphCompiler::FinalizeEntryPoints(const Code& code) {
-  code.set_entry_point_skipping_type_checks_pc(
-      entry_point_skipping_type_checks);
-  code.set_entry_point_skipping_type_checks(
+  code.set_unchecked_entrypoint_pc_offset(entry_point_skipping_type_checks);
+  code.set_unchecked_entry_point(
       Instructions::Handle(code.instructions()).PayloadStart() +
       entry_point_skipping_type_checks);
 }

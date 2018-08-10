@@ -322,11 +322,11 @@ void Disassembler::DisassembleCodeHelper(const char* function_fullname,
       ExceptionHandlers::Handle(zone, code.exception_handlers());
   THR_Print("%s}\n", handlers.ToCString());
 
-  if (code.entry_point_skipping_type_checks_pc()) {
-    THR_Print("Entry-point skipping type checks at offset 0x%" Px "\n",
-              code.entry_point_skipping_type_checks_pc());
+  if (code.unchecked_entrypoint_pc_offset()) {
+    THR_Print("Unchecked entrypoint at offset 0x%" Px "\n",
+              code.unchecked_entrypoint_pc_offset());
   } else {
-    THR_Print("No entry-point skipping type checks.\n");
+    THR_Print("No unchecked entrypoint.\n");
   }
 
   {

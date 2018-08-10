@@ -2315,8 +2315,8 @@ class Function : public Object {
     return OFFSET_OF(RawFunction, entry_point_);
   }
 
-  static intptr_t entry_point_skipping_type_checks_offset() {
-    return OFFSET_OF(RawFunction, entry_point_skipping_type_checks_);
+  static intptr_t unchecked_entry_point_offset() {
+    return OFFSET_OF(RawFunction, unchecked_entry_point_);
   }
 
 #if defined(DART_USE_INTERPRETER)
@@ -2491,7 +2491,7 @@ class Function : public Object {
     return I->type_checks();
   }
 
-  bool MayHaveEntryPointSkippingTypeChecks(Isolate* I) const;
+  bool MayHaveUncheckedEntryPoint(Isolate* I) const;
 
   TokenPosition token_pos() const {
 #if defined(DART_PRECOMPILED_RUNTIME)
@@ -4834,8 +4834,8 @@ class Code : public Object {
   static intptr_t monomorphic_entry_point_offset() {
     return OFFSET_OF(RawCode, monomorphic_entry_point_);
   }
-  static intptr_t entry_point_skipping_type_checks_offset() {
-    return OFFSET_OF(RawCode, entry_point_skipping_type_checks_);
+  static intptr_t unchecked_entry_point_offset() {
+    return OFFSET_OF(RawCode, unchecked_entry_point_);
   }
 
   RawObjectPool* object_pool() const { return raw_ptr()->object_pool_; }
@@ -5152,21 +5152,20 @@ class Code : public Object {
 
   bool IsDisabled() const { return instructions() != active_instructions(); }
 
-  uword entry_point_skipping_type_checks() const {
-    return raw_ptr()->entry_point_skipping_type_checks_;
+  uword unchecked_entry_point() const {
+    return raw_ptr()->unchecked_entry_point_;
   }
 
-  void set_entry_point_skipping_type_checks(uword value) const {
-    StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_, value);
+  void set_unchecked_entry_point(uword value) const {
+    StoreNonPointer(&raw_ptr()->unchecked_entry_point_, value);
   }
 
-  uword entry_point_skipping_type_checks_pc() const {
-    return raw_ptr()->entry_point_skipping_type_checks_pc_;
+  uword unchecked_entrypoint_pc_offset() const {
+    return raw_ptr()->unchecked_entrypoint_pc_offset_;
   }
 
-  void set_entry_point_skipping_type_checks_pc(uword value) const {
-    StoreNonPointer(&raw_ptr()->entry_point_skipping_type_checks_pc_,
-                    value);
+  void set_unchecked_entrypoint_pc_offset(uword value) const {
+    StoreNonPointer(&raw_ptr()->unchecked_entrypoint_pc_offset_, value);
   }
 
  private:
