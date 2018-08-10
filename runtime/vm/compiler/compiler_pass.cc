@@ -450,20 +450,20 @@ void OptimizeTypeCheckedCalls(FlowGraph* flow_graph) {
             auto& target = instr->function();
             if (!target.is_static() &&
                 target.kind() == RawFunction::kRegularFunction) {
-              instr->set_can_skip_callee_type_checks(true);
+              instr->set_use_unchecked_entry(true);
             }
           }
         }
       } else if (InstanceCallInstr* instr = current->AsInstanceCall()) {
         Value* receiver = instr->Receiver();
         if (flow_graph->IsReceiver(receiver->definition())) {
-          instr->set_can_skip_callee_type_checks(true);
+          instr->set_use_unchecked_entry(true);
         }
       } else if (PolymorphicInstanceCallInstr* instr =
                      current->AsPolymorphicInstanceCall()) {
         Value* receiver = instr->Receiver();
         if (flow_graph->IsReceiver(receiver->definition())) {
-          instr->instance_call()->set_can_skip_callee_type_checks(true);
+          instr->instance_call()->set_use_unchecked_entry(true);
         }
       }
     }

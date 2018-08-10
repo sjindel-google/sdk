@@ -3879,12 +3879,12 @@ void InstanceCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
           ICData::ZoneHandle(zone, ic_data()->AsUnaryClassChecks());
       compiler->GenerateInstanceCall(deopt_id(), token_pos(), locs(),
                                      unary_ic_data,
-                                     can_skip_callee_type_checks());
+                                     use_unchecked_entry());
     } else {
       // Call was not visited yet, use original ICData in order to populate it.
       compiler->GenerateInstanceCall(deopt_id(), token_pos(), locs(),
                                      *call_ic_data,
-                                     can_skip_callee_type_checks());
+                                     use_unchecked_entry());
     }
   } else {
     // Unoptimized code.
@@ -4166,7 +4166,7 @@ void StaticCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
   ArgumentsInfo args_info(type_args_len(), ArgumentCount(), argument_names());
   compiler->GenerateStaticCall(deopt_id(), token_pos(), function(), args_info,
                                locs(), *call_ic_data, rebind_rule_,
-                               can_skip_callee_type_checks());
+                               use_unchecked_entry());
   if (function().IsFactory()) {
     TypeUsageInfo* type_usage_info = compiler->thread()->type_usage_info();
     if (type_usage_info != nullptr) {

@@ -1804,7 +1804,7 @@ void FlowGraphCompiler::EmitPolymorphicInstanceCall(
                     deopt,  // No cid match.
                     &ok,    // Found cid.
                     deopt_id, token_pos, locs, complete, total_ic_calls,
-                    original_call.can_skip_callee_type_checks());
+                    original_call.use_unchecked_entry());
     assembler()->Bind(&ok);
   } else {
     if (complete) {
@@ -1813,7 +1813,7 @@ void FlowGraphCompiler::EmitPolymorphicInstanceCall(
                       NULL,  // No cid match.
                       &ok,   // Found cid.
                       deopt_id, token_pos, locs, true, total_ic_calls,
-                      original_call.can_skip_callee_type_checks());
+                      original_call.use_unchecked_entry());
       assembler()->Bind(&ok);
     } else {
       const ICData& unary_checks = ICData::ZoneHandle(

@@ -3182,13 +3182,13 @@ class ClosureCallInstr : public TemplateDartCall<1> {
                    ClosureCallNode* node,
                    PushArgumentsArray* arguments,
                    intptr_t deopt_id,
-                   bool is_statically_checked_call = false)
+                   bool use_unchecked_entry = false)
       : TemplateDartCall(deopt_id,
                          node->arguments()->type_args_len(),
                          node->arguments()->names(),
                          arguments,
                          node->token_pos()),
-        is_statically_checked_call_(is_statically_checked_call) {
+        use_unchecked_entry_(use_unchecked_entry) {
     ASSERT(!arguments->is_empty());
     SetInputAt(0, function);
   }
@@ -3199,13 +3199,13 @@ class ClosureCallInstr : public TemplateDartCall<1> {
                    const Array& argument_names,
                    TokenPosition token_pos,
                    intptr_t deopt_id,
-                   bool is_statically_checked_call = false)
+                   bool use_unchecked_entry = false)
       : TemplateDartCall(deopt_id,
                          type_args_len,
                          argument_names,
                          arguments,
                          token_pos),
-        is_statically_checked_call_(is_statically_checked_call) {
+        use_unchecked_entry_(use_unchecked_entry) {
     ASSERT(!arguments->is_empty());
     SetInputAt(0, function);
   }
@@ -3219,8 +3219,8 @@ class ClosureCallInstr : public TemplateDartCall<1> {
 
   virtual bool HasUnknownSideEffects() const { return true; }
 
-  bool is_statically_checked_call() const {
-    return is_statically_checked_call_;
+  bool use_unchecked_entry() const {
+    return use_unchecked_entry_;
   }
 
   PRINT_OPERANDS_TO_SUPPORT
@@ -3228,7 +3228,7 @@ class ClosureCallInstr : public TemplateDartCall<1> {
  private:
   DISALLOW_COPY_AND_ASSIGN(ClosureCallInstr);
 
-  const bool is_statically_checked_call_;
+  const bool use_unchecked_entry_;
 };
 
 class InstanceCallInstr : public TemplateDartCall<0> {
@@ -3358,12 +3358,12 @@ class InstanceCallInstr : public TemplateDartCall<0> {
 
   RawFunction* ResolveForReceiverClass(const Class& cls, bool allow_add = true);
 
-  bool can_skip_callee_type_checks() const {
-    return can_skip_callee_type_checks_;
+  bool use_unchecked_entry() const {
+    return use_unchecked_entry_;
   }
 
-  void set_can_skip_callee_type_checks(bool value) {
-    can_skip_callee_type_checks_ = value;
+  void set_use_unchecked_entry(bool value) {
+    use_unchecked_entry_ = value;
   }
 
  protected:
@@ -3378,7 +3378,7 @@ class InstanceCallInstr : public TemplateDartCall<0> {
   const Function& interface_target_;
   CompileType* result_type_;  // Inferred result type.
   bool has_unique_selector_;
-  bool can_skip_callee_type_checks_ = false;
+  bool use_unchecked_entry_ = false;
 
   DISALLOW_COPY_AND_ASSIGN(InstanceCallInstr);
 };
@@ -3771,7 +3771,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
         rebind_rule_(rebind_rule),
         result_type_(NULL),
         is_known_list_constructor_(false),
-        can_skip_callee_type_checks_(false),
+        use_unchecked_entry_(false),
         identity_(AliasIdentity::Unknown()) {
     ic_data_ = GetICData(ic_data_array);
     ASSERT(function.IsZoneHandle());
@@ -3797,7 +3797,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
         rebind_rule_(rebind_rule),
         result_type_(NULL),
         is_known_list_constructor_(false),
-        can_skip_callee_type_checks_(false),
+        use_unchecked_entry_(false),
         identity_(AliasIdentity::Unknown()) {
     ASSERT(function.IsZoneHandle());
     ASSERT(!function.IsNull());
@@ -3869,12 +3869,12 @@ class StaticCallInstr : public TemplateDartCall<0> {
     is_known_list_constructor_ = value;
   }
 
-  bool can_skip_callee_type_checks() const {
-    return can_skip_callee_type_checks_;
+  bool use_unchecked_entry() const {
+    return use_unchecked_entry_;
   }
 
-  void set_can_skip_callee_type_checks(bool value) {
-    can_skip_callee_type_checks_ = value;
+  void set_use_unchecked_entry(bool value) {
+    use_unchecked_entry_ = value;
   }
 
   bool IsRecognizedFactory() const { return is_known_list_constructor(); }
@@ -3894,7 +3894,7 @@ class StaticCallInstr : public TemplateDartCall<0> {
   // 'True' for recognized list constructors.
   bool is_known_list_constructor_;
 
-  bool can_skip_callee_type_checks_;
+  bool use_unchecked_entry_;
 
   AliasIdentity identity_;
 

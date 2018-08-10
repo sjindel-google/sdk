@@ -489,8 +489,8 @@ void ClosureCallInstr::PrintOperandsTo(BufferFormatter* f) const {
     f->Print(", ");
     PushArgumentAt(i)->value()->PrintTo(f);
   }
-  if (is_statically_checked_call()) {
-    f->Print(" skipping callee parameter checks");
+  if (use_unchecked_entry()) {
+    f->Print(" using unchecked entrypoint");
   }
 }
 
@@ -520,8 +520,8 @@ void PolymorphicInstanceCallInstr::PrintOperandsTo(BufferFormatter* f) const {
   if (complete()) {
     f->Print(" COMPLETE");
   }
-  if (instance_call()->can_skip_callee_type_checks()) {
-    f->Print(" skipping callee type checks");
+  if (instance_call()->use_unchecked_entry()) {
+    f->Print(" using unchecked entrypoint");
   }
 }
 
@@ -566,7 +566,7 @@ void StaticCallInstr::PrintOperandsTo(BufferFormatter* f) const {
     if (i > 0) f->Print(", ");
     PushArgumentAt(i)->value()->PrintTo(f);
   }
-  if (can_skip_callee_type_checks()) {
+  if (use_unchecked_entry()) {
     f->Print(", skipping callee type checks");
   }
 }

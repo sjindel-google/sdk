@@ -963,14 +963,14 @@ class CallSiteInliner : public ValueObject {
         if (UseKernelFrontEndFor(parsed_function)) {
           bool unchecked_entry = false;
           if (StaticCallInstr* instr = call_data->call->AsStaticCall()) {
-            unchecked_entry = instr->can_skip_callee_type_checks();
+            unchecked_entry = instr->use_unchecked_entry();
           } else if (InstanceCallInstr* instr = call_data->call->AsInstanceCall()) {
-            unchecked_entry = instr->can_skip_callee_type_checks();
+            unchecked_entry = instr->use_unchecked_entry();
           } else if (PolymorphicInstanceCallInstr* instr =
                          call_data->call->AsPolymorphicInstanceCall()) {
-            unchecked_entry = instr->instance_call()->can_skip_callee_type_checks();
+            unchecked_entry = instr->instance_call()->use_unchecked_entry();
           } else if (ClosureCallInstr* instr = call_data->call->AsClosureCall()) {
-            unchecked_entry = instr->is_statically_checked_call();
+            unchecked_entry = instr->use_unchecked_entry();
           }
           kernel::FlowGraphBuilder builder(
               parsed_function, *ic_data_array, /* not building var desc */ NULL,
