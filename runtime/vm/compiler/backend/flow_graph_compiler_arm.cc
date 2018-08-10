@@ -894,7 +894,7 @@ void FlowGraphCompiler::CompileGraph() {
   }
 #endif  // DART_PRECOMPILER
 
-  entry_point_skipping_type_checks = __ CodeSize();
+  unchecked_entrypoint_pc_offset = __ CodeSize();
 
   if (TryIntrinsify()) {
     // Skip regular code generation.

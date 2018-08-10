@@ -876,12 +876,10 @@ void FlowGraphCompiler::EmitPrologue() {
   EndCodeSourceRange(TokenPosition::kDartCodePrologue);
 }
 
-volatile int ctr2 = 0;
-
 void FlowGraphCompiler::CompileGraph() {
   InitCompiler();
-  const Function& function = parsed_function().function();
 #ifdef DART_PRECOMPILER
+  const Function& function = parsed_function().function();
   if (function.IsDynamicFunction()) {
     __ MonomorphicCheckedEntry();
   }
@@ -889,11 +887,7 @@ void FlowGraphCompiler::CompileGraph() {
 
   // Always set the safe entry-point to a valid entry position, even if we're
   // not emitting special code for it.
-  entry_point_skipping_type_checks = __ CodeSize();
-
-  if (strstr(function.ToCString(), "_addEntry")) {
-    ++ctr2;
-  }
+  unchecked_entrypoint_pc_offset = __ CodeSize();
 
   if (TryIntrinsify()) {
     // Skip regular code generation.

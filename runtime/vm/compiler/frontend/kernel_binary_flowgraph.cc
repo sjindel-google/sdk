@@ -461,7 +461,7 @@ Fragment StreamingFlowGraphBuilder::BuildDefaultTypeHandling(
 
 void StreamingFlowGraphBuilder::RecordExtraEntryPoint(TargetEntryInstr* extra_entry) {
   if (!B->IsInlining()) {
-    B->graph_entry_->set_entry_skipping_type_checks(extra_entry);
+    B->graph_entry_->set_unchecked_entry(extra_entry);
   } else if (B->SkippingTypeChecks()) {
     B->graph_entry_->set_normal_entry(extra_entry);
   }
@@ -496,9 +496,8 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
   BlockEntryInstr* instruction_cursor =
       flow_graph_builder_->BuildPrologue(normal_entry, &prologue_info);
 
-  flow_graph_builder_->graph_entry_ =
-      new (Z) GraphEntryInstr(*parsed_function(), normal_entry,
-                              Compiler::kNoOSRDeoptId);
+  flow_graph_builder_->graph_entry_ = new (Z) GraphEntryInstr(
+      *parsed_function(), normal_entry, Compiler::kNoOSRDeoptId);
 
   const Fragment prologue =
       flow_graph_builder_->CheckStackOverflowInPrologue(function.token_pos());

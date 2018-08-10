@@ -271,8 +271,7 @@ static bool IsEmptyBlock(BlockEntryInstr* block) {
   const bool is_unchecked_entrypoint =
       block->PredecessorCount() == 1 &&
       block->PredecessorAt(0)->IsGraphEntry() &&
-      block ==
-          block->PredecessorAt(0)->AsGraphEntry()->entry_skipping_type_checks();
+      block == block->PredecessorAt(0)->AsGraphEntry()->unchecked_entry();
   return !block->IsCatchBlockEntry() && !block->HasNonRedundantParallelMove() &&
          block->next()->IsGoto() &&
          !block->next()->AsGoto()->HasNonRedundantParallelMove() &&
@@ -913,10 +912,10 @@ void FlowGraphCompiler::EmitDeopt(intptr_t deopt_id,
 #endif  // defined(TARGET_ARCH_DBC)
 
 void FlowGraphCompiler::FinalizeEntryPoints(const Code& code) {
-  code.set_unchecked_entrypoint_pc_offset(entry_point_skipping_type_checks);
+  code.set_unchecked_entrypoint_pc_offset(unchecked_entrypoint_pc_offset);
   code.set_unchecked_entry_point(
       Instructions::Handle(code.instructions()).PayloadStart() +
-      entry_point_skipping_type_checks);
+      unchecked_entrypoint_pc_offset);
 }
 
 void FlowGraphCompiler::FinalizeExceptionHandlers(const Code& code) {
@@ -1293,12 +1292,11 @@ void FlowGraphCompiler::EmitComment(Instruction* instr) {
 bool FlowGraphCompiler::NeedsEdgeCounter(TargetEntryInstr* block) {
   // Only emit an edge counter if there is not goto at the end of the block,
   // except for the entry block.
-  return (
-      FLAG_reorder_basic_blocks &&
-      (!block->last_instruction()->IsGoto() ||
-       (block == flow_graph().graph_entry()->normal_entry()) ||
-       // SAMIR_TODO: do we need this?
-       (block == flow_graph().graph_entry()->entry_skipping_type_checks())));
+  return (FLAG_reorder_basic_blocks &&
+          (!block->last_instruction()->IsGoto() ||
+           (block == flow_graph().graph_entry()->normal_entry()) ||
+           // SAMIR_TODO: do we need this?
+           (block == flow_graph().graph_entry()->unchecked_entry())));
 }
 
 // Allocate a register that is not explictly blocked.

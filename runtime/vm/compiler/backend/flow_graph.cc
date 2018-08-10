@@ -409,7 +409,7 @@ bool FlowGraph::IsReceiver(Definition* def) const {
   if (def->IsParameter()) return (def->AsParameter()->index() == 0);
   if (!def->IsPhi() ||
       (graph_entry()->catch_entries().is_empty() &&
-       graph_entry()->entry_skipping_type_checks() == nullptr)) {
+       graph_entry()->unchecked_entry() == nullptr)) {
     return false;
   }
   PhiInstr* phi = def->AsPhi();

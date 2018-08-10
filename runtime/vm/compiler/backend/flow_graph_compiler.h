@@ -748,7 +748,7 @@ class FlowGraphCompiler : public ValueObject {
                                      int bias,
                                      bool jump_on_miss = true);
 
-  uword entry_point_skipping_type_checks = 0;
+  uword unchecked_entrypoint_pc_offset = 0;
 
  private:
   friend class CheckStackOverflowSlowPath;  // For pending_deoptimization_env_.

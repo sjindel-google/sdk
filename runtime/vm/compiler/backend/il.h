@@ -1520,17 +1520,10 @@ class GraphEntryInstr : public BlockEntryInstr {
     fixed_slot_count_ = count;
   }
   TargetEntryInstr* normal_entry() const { return normal_entry_; }
-
-  TargetEntryInstr* entry_skipping_type_checks() const {
-    return entry_skipping_type_checks_;
-  }
-
-  void set_normal_entry(TargetEntryInstr* entry) {
-    normal_entry_ = entry;
-  }
-
-  void set_entry_skipping_type_checks(TargetEntryInstr* target) {
-    entry_skipping_type_checks_ = target;
+  TargetEntryInstr* unchecked_entry() const { return unchecked_entry_; }
+  void set_normal_entry(TargetEntryInstr* entry) { normal_entry_ = entry; }
+  void set_unchecked_entry(TargetEntryInstr* target) {
+    unchecked_entry_ = target;
   }
 
   const ParsedFunction& parsed_function() const { return parsed_function_; }
@@ -1551,7 +1544,7 @@ class GraphEntryInstr : public BlockEntryInstr {
 
   const ParsedFunction& parsed_function_;
   TargetEntryInstr* normal_entry_;
-  TargetEntryInstr* entry_skipping_type_checks_ = nullptr;
+  TargetEntryInstr* unchecked_entry_ = nullptr;
   GrowableArray<CatchBlockEntryInstr*> catch_entries_;
   // Indirect targets are blocks reachable only through indirect gotos.
   GrowableArray<IndirectEntryInstr*> indirect_entries_;
