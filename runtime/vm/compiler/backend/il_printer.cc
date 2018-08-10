@@ -567,7 +567,7 @@ void StaticCallInstr::PrintOperandsTo(BufferFormatter* f) const {
     PushArgumentAt(i)->value()->PrintTo(f);
   }
   if (use_unchecked_entry()) {
-    f->Print(", skipping callee type checks");
+    f->Print(", using unchecked entrypoint");
   }
 }
 

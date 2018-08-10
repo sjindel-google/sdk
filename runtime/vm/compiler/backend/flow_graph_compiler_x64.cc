@@ -996,7 +996,7 @@ void FlowGraphCompiler::EmitOptimizedInstanceCall(const StubEntry& stub_entry,
   __ LoadObject(RDI, parsed_function().function());
   __ LoadUniqueObject(RBX, ic_data);
   GenerateDartCall(deopt_id, token_pos, stub_entry, RawPcDescriptors::kIcCall,
-                   locs);
+                   locs, use_unchecked_entry);
   __ Drop(ic_data.CountWithTypeArgs(), RCX);
 }
 

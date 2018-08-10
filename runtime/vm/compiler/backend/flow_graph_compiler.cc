@@ -268,14 +268,14 @@ bool FlowGraphCompiler::ForceSlowPathForStackOverflow() const {
 static bool IsEmptyBlock(BlockEntryInstr* block) {
   // Unchecked entry-points cannot be merged because they must have assembly
   // prologue emitted which should not be included in any block they jump to.
-  const bool is_unchecked_entrypoint =
+  const bool is_unchecked_entry =
       block->PredecessorCount() == 1 &&
       block->PredecessorAt(0)->IsGraphEntry() &&
       block == block->PredecessorAt(0)->AsGraphEntry()->unchecked_entry();
   return !block->IsCatchBlockEntry() && !block->HasNonRedundantParallelMove() &&
          block->next()->IsGoto() &&
          !block->next()->AsGoto()->HasNonRedundantParallelMove() &&
-         !block->IsIndirectEntry() && !is_unchecked_entrypoint;
+         !block->IsIndirectEntry() && !is_unchecked_entry;
 }
 
 void FlowGraphCompiler::CompactBlock(BlockEntryInstr* block) {
@@ -1114,7 +1114,6 @@ bool FlowGraphCompiler::TryIntrinsify() {
   // before any deoptimization point.
   ASSERT(!intrinsic_slow_path_label_.IsBound());
   assembler()->Bind(&intrinsic_slow_path_label_);
-
   return complete;
 }
 
@@ -1933,7 +1932,7 @@ void FlowGraphCompiler::EmitTestAndCall(const CallTargets& targets,
   if (add_megamorphic_call) {
     int try_index = CatchClauseNode::kInvalidTryIndex;
     EmitMegamorphicInstanceCall(function_name, arguments_descriptor, deopt_id,
-                                token_index, locs, try_index, 0);
+                                token_index, locs, try_index);
   }
 }
 

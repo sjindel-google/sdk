@@ -4132,11 +4132,6 @@ LocationSummary* StaticCallInstr::MakeLocationSummary(Zone* zone,
 }
 
 void StaticCallInstr::EmitNativeCode(FlowGraphCompiler* compiler) {
-  if (strstr(compiler->function().ToFullyQualifiedCString(), "HashMap") &&
-      strstr(compiler->function().ToFullyQualifiedCString(), "[]=") &&
-      strstr(function().ToCString(), "_addEntry")) {
-    // __ Breakpoint();
-  }
   Zone* zone = compiler->zone();
   const ICData* call_ic_data = NULL;
   if (!FLAG_propagate_ic_data || !compiler->is_optimizing() ||
