@@ -599,7 +599,7 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
 
   // Setup multiple entrypoints if useful.
   TargetEntryInstr* extra_entry = nullptr;
-  if (FLAG_enable_multiple_entrypoints) {
+  if (function.MayHaveUncheckedEntryPoint(I)) {
     if (PrologueBuilder::PrologueOnlyNeededOnDynamicCall(function)) {
       // Use separate entry points since we can skip almost everything on the
       // static entry.

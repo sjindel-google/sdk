@@ -8268,7 +8268,8 @@ RawCode* Function::EnsureHasCode() const {
 
 bool Function::MayHaveUncheckedEntryPoint(Isolate* I) const {
 #if defined(TARGET_ARCH_X64) || defined(TARGET_ARCH_ARM)
-  return NeedsArgumentTypeChecks(I) || IsImplicitClosureFunction();
+  return FLAG_enable_multiple_entrypoints &&
+         (NeedsArgumentTypeChecks(I) || IsImplicitClosureFunction());
 #else
   return false;
 #endif
