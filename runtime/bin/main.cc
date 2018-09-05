@@ -1129,10 +1129,6 @@ void main(int argc, char** argv) {
   bool print_flags_seen = false;
   bool verbose_debug_seen = false;
 
-  if (getenv("SERVICE_TEST_TESTEE")) {
-    sleep(10);
-  }
-
   // Perform platform specific initialization.
   if (!Platform::Initialize()) {
     Log::PrintErr("Initialization failed\n");
