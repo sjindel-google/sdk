@@ -385,7 +385,9 @@ const Array& KernelLoader::ReadConstantTable() {
 
 void KernelLoader::EvaluateDelayedPragmas() {
   if (potential_pragma_functions_.IsNull()) return;
-  DisableThreadInterruptsScope dtis(Thread::Current());
+  Thread* thread = Thread::Current();
+  NoOOBMessageScope no_msg_scope(thread);
+  NoReloadScope no_reload_scope(thread->isolate(), thread);
 
   Function& function = Function::Handle();
   Library& library = Library::Handle();
@@ -1710,7 +1712,9 @@ void KernelLoader::LoadProcedure(const Library& library,
       EnsurePotentialPragmaFunctions();
       potential_pragma_functions_.Add(function);
     } else {
-      DisableThreadInterruptsScope dtis(Thread::Current());
+      Thread* thread = Thread::Current();
+      NoOOBMessageScope no_msg_scope(thread);
+      NoReloadScope no_reload_scope(thread->isolate(), thread);
       library.GetMetadata(function);
     }
   }
