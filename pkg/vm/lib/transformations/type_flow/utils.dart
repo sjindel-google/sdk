@@ -7,7 +7,13 @@
 library vm.transformations.type_flow.utils;
 
 import 'package:kernel/ast.dart'
-    show Constructor, FunctionNode, Member, VariableDeclaration;
+    show
+        Constructor,
+        DartType,
+        Procedure,
+        FunctionNode,
+        Member,
+        VariableDeclaration;
 
 const bool kPrintTrace =
     const bool.fromEnvironment('global.type.flow.print.trace');
@@ -50,6 +56,10 @@ const int kHashMask = 0x3fffffff;
 
 bool hasReceiverArg(Member member) =>
     member.isInstanceMember || (member is Constructor);
+
+int numTypeParams(Member member) => member is Procedure && member.isFactory
+    ? member.function.typeParameters.length
+    : 0;
 
 /// Returns true if elements in [list] are in strictly increasing order.
 /// List with duplicates is considered not sorted.
@@ -147,4 +157,20 @@ class Statistics {
     ${throwExpressionsPruned} throw expressions pruned
     """);
   }
+}
+
+int typeArgumentsHash(List<DartType> typeArgs) {
+  int hash = 1237;
+  for (var t in typeArgs) {
+    hash = (((hash * 31) & kHashMask) + t.hashCode) & kHashMask;
+  }
+  return hash;
+}
+
+bool typeArgumentsEquals(List<DartType> x, List<DartType> y) {
+  if (x.length != y.length) return false;
+  for (int i = 0; i < x.length; ++i) {
+    if (x[i] != y[i]) return false;
+  }
+  return true;
 }

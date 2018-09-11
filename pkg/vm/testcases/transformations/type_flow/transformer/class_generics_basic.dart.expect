@@ -1,0 +1,57 @@
+library #lib;
+import self as self;
+import "dart:core" as core;
+
+class C<T extends core::Object = dynamic> extends core::Object {
+  synthetic constructor •() → self::C<self::C::T>
+    : super core::Object::•()
+    ;
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method foo() → dynamic
+    return new self::D::•<self::C::T>();
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method id1([@vm.inferred-type.metadata=#lib::Y (skip check)] generic-covariant-impl self::C::T x) → dynamic
+    return x;
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method id2([@vm.inferred-type.metadata=#lib::Z] generic-covariant-impl self::C::T x) → dynamic
+    return x;
+}
+class D<T extends core::Object = dynamic> extends core::Object {
+  synthetic constructor •() → self::D<self::D::T>
+    : super core::Object::•()
+    ;
+}
+class E<S extends core::Object = dynamic, T extends core::Object = dynamic> extends self::C<self::E::T> {
+  synthetic constructor •() → self::E<self::E::S, self::E::T>
+    : super self::C::•()
+    ;
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method foo() → dynamic
+    return [@vm.inferred-type.metadata=#lib::D<dart.core::String>] super.{self::C::foo}();
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method bar() → dynamic
+    return new self::D::•<self::E::S>();
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method baz() → dynamic
+    return new self::D::•<self::E::T>();
+}
+abstract class X extends core::Object {
+  synthetic constructor •() → self::X
+    : super core::Object::•()
+    ;
+}
+class Y extends self::X {
+  synthetic constructor •() → self::Y
+    : super self::X::•()
+    ;
+}
+class Z extends self::X {
+  synthetic constructor •() → self::Z
+    : super self::X::•()
+    ;
+}
+static method main() → dynamic {
+  dynamic used;
+  used = [@vm.direct-call.metadata=#lib::C::foo] [@vm.inferred-type.metadata=#lib::D<dart.core::int>] new self::C::•<core::int>().{self::C::foo}();
+  used = [@vm.direct-call.metadata=#lib::E::foo] [@vm.inferred-type.metadata=#lib::D<dart.core::String>] new self::E::•<core::int, core::String>().{self::E::foo}();
+  used = [@vm.direct-call.metadata=#lib::E::bar] [@vm.inferred-type.metadata=#lib::D<dart.core::int>] new self::E::•<core::int, core::String>().{self::E::bar}();
+  used = [@vm.direct-call.metadata=#lib::E::baz] [@vm.inferred-type.metadata=#lib::D<dart.core::String>] new self::E::•<core::int, core::String>().{self::E::baz}();
+  self::C<self::X> c = new self::C::•<self::Y>();
+  [@vm.call-site-attributes.metadata=receiverType:#lib::C<#lib::X>] [@vm.direct-call.metadata=#lib::C::id1] c.{self::C::id1}(new self::Y::•());
+  [@vm.call-site-attributes.metadata=receiverType:#lib::C<#lib::X>] [@vm.direct-call.metadata=#lib::C::id2] c.{self::C::id2}(new self::Z::•());
+  return used;
+}

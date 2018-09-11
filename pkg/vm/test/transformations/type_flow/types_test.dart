@@ -26,6 +26,12 @@ class TestTypeHierarchy implements TypeHierarchy {
         reason: "specializeTypeCone($base) is not defined");
     return result;
   }
+
+  List<FactoredGenericInterfaces> factoredGenericInterfacesOf(Class klass) =>
+      throw "factoredGenericInterfacesOf is not supported in the types test.";
+
+  int genericInterfaceIndexFor(Class klass, Class iface) =>
+      throw "genericInterfaceIndexFor is not supported in the types test.";
 }
 
 main() {

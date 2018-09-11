@@ -171,7 +171,8 @@ class _DirectInvocation extends _Invocation {
         assertx(args.values.length == firstParamIndex + 1);
         assertx(args.names.isEmpty);
         final Type setterArg = args.values[firstParamIndex];
-        fieldValue.setValue(setterArg, typeFlowAnalysis);
+        fieldValue.setValue(
+            setterArg, typeFlowAnalysis, field.isStatic ? null : args.receiver);
         return const EmptyType();
 
       case CallKind.Method:
@@ -202,7 +203,8 @@ class _DirectInvocation extends _Invocation {
           // does not throw exception.
           initializerResult = new Type.nullable(initializerResult);
         }
-        fieldValue.setValue(initializerResult, typeFlowAnalysis);
+        fieldValue.setValue(initializerResult, typeFlowAnalysis,
+            field.isStatic ? null : args.receiver);
         return const EmptyType();
     }
 
@@ -251,7 +253,8 @@ class _DirectInvocation extends _Invocation {
 
     final int positionalArguments = args.positionalCount;
 
-    final int firstParamIndex = hasReceiverArg(selector.member) ? 1 : 0;
+    final int firstParamIndex = numTypeParams(selector.member) +
+        (hasReceiverArg(selector.member) ? 1 : 0);
     final int requiredParameters =
         firstParamIndex + function.requiredParameterCount;
     if (positionalArguments < requiredParameters) {
@@ -698,13 +701,23 @@ class _InvocationsCache {
 class _FieldValue extends _DependencyTracker {
   final Field field;
   final Type staticType;
+  final Summary typeGuardSummary;
   Type value;
 
-  _FieldValue(this.field) : staticType = new Type.fromStatic(field.type) {
+  _FieldValue(this.field, this.typeGuardSummary)
+      : staticType = new Type.fromStatic(field.type) {
     if (field.initializer == null && _isDefaultValueOfFieldObservable()) {
       value = new Type.nullable(const EmptyType());
     } else {
       value = const EmptyType();
+    }
+  }
+
+  bool get skipCheck {
+    if (typeGuardSummary != null) {
+      return (typeGuardSummary.result as TypeCheck).canSkip;
+    } else {
+      return false;
     }
   }
 
@@ -750,7 +763,8 @@ class _FieldValue extends _DependencyTracker {
     return value;
   }
 
-  void setValue(Type newValue, TypeFlowAnalysis typeFlowAnalysis) {
+  void setValue(
+      Type newValue, TypeFlowAnalysis typeFlowAnalysis, Type receiverType) {
     // Make sure type cones are specialized before putting them into field
     // value, in order to ensure that dependency is established between
     // cone's base type and corresponding field setter.
@@ -776,11 +790,12 @@ class _FieldValue extends _DependencyTracker {
     // is established.
     //
     final hierarchy = typeFlowAnalysis.hierarchyCache;
-    Type newType = value
-        .union(
-            newValue.specialize(hierarchy).intersection(staticType, hierarchy),
-            hierarchy)
-        .specialize(hierarchy);
+    final narrowedNewValue = typeGuardSummary != null
+        ? typeGuardSummary.apply(
+            new Args([receiverType, newValue]), hierarchy, typeFlowAnalysis)
+        : newValue.specialize(hierarchy).intersection(staticType, hierarchy);
+    Type newType =
+        value.union(narrowedNewValue, hierarchy).specialize(hierarchy);
     assertx(newType.isSpecialized);
 
     if (newType != value) {
@@ -812,7 +827,7 @@ class _ClassData extends _DependencyTracker implements ClassId<_ClassData> {
 
   /// Flag indicating if this class has a noSuchMethod() method not inherited
   /// from Object.
-  /// Lazy initialized by _ClassHierarchyCache.hasNonTrivialNoSuchMethod().
+  /// Lazy initialized by ClassHierarchyCache.hasNonTrivialNoSuchMethod().
   bool hasNonTrivialNoSuchMethod;
 
   _ClassData(this._id, this.class_, this.supertypes) {
@@ -821,7 +836,7 @@ class _ClassData extends _DependencyTracker implements ClassId<_ClassData> {
 
   ConcreteType _concreteType;
   ConcreteType get concreteType =>
-      _concreteType ??= new ConcreteType(this, class_.rawType);
+      _concreteType ??= new ConcreteType(this, class_.rawType, null);
 
   Type _specializedConeType;
   Type get specializedConeType =>
@@ -865,11 +880,83 @@ class _ClassData extends _DependencyTracker implements ClassId<_ClassData> {
   String dump() => "$this {supers: $supertypes}";
 }
 
+class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
+  final ClosedWorldClassHierarchy hierarchy;
+
+  final cachedFactoredGenericInterfaces =
+      <Class, List<FactoredGenericInterfaces>>{};
+
+  GenericInterfacesInfoImpl(this.hierarchy);
+
+  // Returns a list of all the generic interfaces of 'klass', grouped by
+  // distinct type-args vectors.
+  //
+  // For example:
+  //
+  // class C<T> extends A<T> implements B<int, T> {}
+  //
+  // Will have the groups:
+  //
+  // {C, A}: <T>
+  // {B}: <int, T>
+  //
+  // The order of the groups returned is determinsitic, based on a topological
+  // sort of the classes.
+  List<FactoredGenericInterfaces> factoredGenericInterfacesOf(Class klass) {
+    final cached = cachedFactoredGenericInterfaces[klass];
+    if (cached != null) return cached;
+
+    List<Supertype> rawGenericInterfaces = hierarchy.genericSupertypesOf(klass);
+
+    final forward = <Class, List<DartType>>{};
+    final backward = new HashMap<List<DartType>, Set<Class>>(
+        equals: typeArgumentsEquals, hashCode: typeArgumentsHash);
+
+    for (final iface in rawGenericInterfaces) {
+      forward[iface.classNode] = iface.typeArguments;
+      backward
+          .putIfAbsent(iface.typeArguments, () => new Set<Class>())
+          .add(iface.classNode);
+    }
+
+    if (!forward.containsKey(klass)) {
+      final selfTypeArgs =
+          klass.typeParameters.map((t) => new TypeParameterType(t)).toList();
+      forward[klass] = selfTypeArgs;
+      backward.putIfAbsent(selfTypeArgs, () => new Set<Class>()).add(klass);
+    }
+
+    Iterable<Class> classOrder =
+        hierarchy.getOrderedClasses(forward.keys).toList().reversed;
+
+    final factored = <FactoredGenericInterfaces>[];
+    for (final iface in classOrder) {
+      final typeArgs = forward[iface];
+      final classSet = backward[typeArgs];
+      if (classSet == null) continue;
+
+      factored.add(new FactoredGenericInterfaces(classSet.toList(), typeArgs));
+      backward.remove(typeArgs);
+    }
+
+    return factored;
+  }
+
+  int genericInterfaceIndexFor(Class klass, Class iface) {
+    final factoredGenericInterfaces = factoredGenericInterfacesOf(klass);
+    for (int i = 0; i < factoredGenericInterfaces.length; ++i) {
+      if (factoredGenericInterfaces[i].interfaces.contains(iface)) return i;
+    }
+    throw "Invalid call to genericInterfaceIndexFor.";
+  }
+}
+
 class _ClassHierarchyCache implements TypeHierarchy {
   final TypeFlowAnalysis _typeFlowAnalysis;
   final ClosedWorldClassHierarchy hierarchy;
   final Set<Class> allocatedClasses = new Set<Class>();
   final Map<Class, _ClassData> classes = <Class, _ClassData>{};
+  final GenericInterfacesInfo genericInterfacesInfo;
 
   /// Object.noSuchMethod().
   final Member objectNoSuchMethod;
@@ -887,10 +974,10 @@ class _ClassHierarchyCache implements TypeHierarchy {
   final Map<DynamicSelector, _DynamicTargetSet> _dynamicTargets =
       <DynamicSelector, _DynamicTargetSet>{};
 
-  _ClassHierarchyCache(this._typeFlowAnalysis, this.hierarchy)
+  _ClassHierarchyCache(this._typeFlowAnalysis, this.hierarchy,
+      this.genericInterfacesInfo, TypeEnvironment environment)
       : objectNoSuchMethod = hierarchy.getDispatchTarget(
-            _typeFlowAnalysis.environment.coreTypes.objectClass,
-            noSuchMethodName) {
+            environment.coreTypes.objectClass, noSuchMethodName) {
     assertx(objectNoSuchMethod != null);
   }
 
@@ -942,6 +1029,9 @@ class _ClassHierarchyCache implements TypeHierarchy {
     if (subType == superType) {
       return true;
     }
+
+    if (superType is DynamicType || superType is VoidType) return true;
+    if (subType is DynamicType || subType is VoidType) return false;
 
     // TODO(alexmarkov): handle function types properly
     if (subType is FunctionType) {
@@ -1056,10 +1146,16 @@ class _ClassHierarchyCache implements TypeHierarchy {
     }
   }
 
+  List<FactoredGenericInterfaces> factoredGenericInterfacesOf(Class klass) =>
+      genericInterfacesInfo.factoredGenericInterfacesOf(klass);
+
+  int genericInterfaceIndexFor(Class klass, Class iface) =>
+      genericInterfacesInfo.genericInterfaceIndexFor(klass, iface);
+
   @override
   String toString() {
     StringBuffer buf = new StringBuffer();
-    buf.write("_ClassHierarchyCache {\n");
+    buf.write("ClassHierarchyCache {\n");
     buf.write("  allocated classes:\n");
     allocatedClasses.forEach((c) {
       buf.write("    $c\n");
@@ -1196,6 +1292,7 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
   SummaryCollector summaryCollector;
   _InvocationsCache _invocationsCache;
   _WorkList workList;
+  GenericInterfacesInfo _genericInterfacesInfo;
 
   final Map<Member, Summary> _summaries = <Member, Summary>{};
   final Map<Field, _FieldValue> _fieldValues = <Field, _FieldValue>{};
@@ -1204,15 +1301,22 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
   final Set<Member> _calledViaInterfaceSelector = new Set<Member>();
   final Set<Member> _calledViaThis = new Set<Member>();
 
-  TypeFlowAnalysis(this.target, Component component, CoreTypes coreTypes,
-      ClosedWorldClassHierarchy hierarchy, this.environment, this.libraryIndex,
+  TypeFlowAnalysis(
+      this.target,
+      Component component,
+      CoreTypes coreTypes,
+      ClosedWorldClassHierarchy hierarchy,
+      this._genericInterfacesInfo,
+      this.environment,
+      this.libraryIndex,
       {PragmaAnnotationParser matcher})
       : annotationMatcher =
             matcher ?? new ConstantPragmaAnnotationParser(coreTypes) {
     nativeCodeOracle = new NativeCodeOracle(libraryIndex, annotationMatcher);
-    hierarchyCache = new _ClassHierarchyCache(this, hierarchy);
-    summaryCollector =
-        new SummaryCollector(target, environment, this, nativeCodeOracle);
+    hierarchyCache = new _ClassHierarchyCache(
+        this, hierarchy, _genericInterfacesInfo, environment);
+    summaryCollector = new SummaryCollector(
+        target, environment, this, nativeCodeOracle, hierarchyCache);
     _invocationsCache = new _InvocationsCache(this);
     workList = new _WorkList(this);
 
@@ -1227,7 +1331,12 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
   }
 
   _FieldValue getFieldValue(Field field) {
-    return _fieldValues[field] ??= new _FieldValue(field);
+    Summary setterSummary = null;
+    if (field.isGenericCovariantImpl) {
+      setterSummary = summaryCollector.createSummary(field,
+          fieldSummaryType: FieldSummaryType.kSetter);
+    }
+    return _fieldValues[field] ??= new _FieldValue(field, setterSummary);
   }
 
   void process() {
@@ -1249,6 +1358,8 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
 
   Type fieldType(Field field) => _fieldValues[field]?.value;
 
+  bool fieldSkipCheck(Field field) => _fieldValues[field]?.skipCheck;
+
   Args<Type> argumentTypes(Member member) => _summaries[member]?.argumentTypes;
 
   bool isTearOffTaken(Member member) => _tearOffTaken.contains(member);
@@ -1267,6 +1378,9 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
   bool isCalledNotViaThis(Member member) =>
       _calledViaDynamicSelector.contains(member) ||
       _calledViaInterfaceSelector.contains(member);
+
+  List<VariableDeclaration> skipCheckParams(Member member) =>
+      _summaries[member]?.skipCheckParams;
 
   /// ---- Implementation of [CallHandler] interface. ----
 
@@ -1309,7 +1423,13 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
 
   @override
   void addDirectFieldAccess(Field field, Type value) {
-    getFieldValue(field).setValue(value, this);
+    final fieldValue = getFieldValue(field);
+    if (field.isStatic) {
+      fieldValue.setValue(value, this, /*receiver_type=*/ null);
+    } else {
+      final receiver = new Type.cone(new InterfaceType(field.parent));
+      fieldValue.setValue(value, this, receiver);
+    }
   }
 
   @override

@@ -41,18 +41,20 @@ Component transformComponent(
       onAmbiguousSupertypes: ignoreAmbiguousSupertypes);
   final types = new TypeEnvironment(coreTypes, hierarchy, strongMode: true);
   final libraryIndex = new LibraryIndex.all(component);
+  final genericInterfacesInfo = new GenericInterfacesInfoImpl(hierarchy);
 
   if (kDumpAllSummaries) {
     Statistics.reset();
-    new CreateAllSummariesVisitor(target, types).visitComponent(component);
+    new CreateAllSummariesVisitor(target, types, genericInterfacesInfo)
+        .visitComponent(component);
     Statistics.print("All summaries statistics");
   }
 
   Statistics.reset();
   final analysisStopWatch = new Stopwatch()..start();
 
-  final typeFlowAnalysis = new TypeFlowAnalysis(
-      target, component, coreTypes, hierarchy, types, libraryIndex,
+  final typeFlowAnalysis = new TypeFlowAnalysis(target, component, coreTypes,
+      hierarchy, genericInterfacesInfo, types, libraryIndex,
       matcher: matcher);
 
   Procedure main = component.mainMethod;
@@ -148,17 +150,26 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
       }
     }
 
+    List<DartType> typeArgs;
+    if (type is ConcreteType && type.typeArgs != null) {
+      typeArgs = type.typeArgs[0]
+          .map((t) => t is AnyType ? null : (t as RuntimeType).representedType)
+          .toList();
+    }
+
     if ((concreteClass != null) || !nullable || isInt) {
-      return new InferredType(concreteClass, nullable, isInt);
+      return new InferredType(concreteClass, nullable, isInt,
+          exactTypeArguments: typeArgs);
     }
 
     return null;
   }
 
-  void _setInferredType(TreeNode node, Type type) {
+  void _setInferredType(TreeNode node, Type type, {bool skipCheck: false}) {
+    assertx(skipCheck == false || node is VariableDeclaration || node is Field);
     final inferredType = _convertType(type);
     if (inferredType != null) {
-      _inferredTypeMetadata.mapping[node] = inferredType;
+      _inferredTypeMetadata.mapping[node] = inferredType..skipCheck = skipCheck;
     }
   }
 
@@ -182,12 +193,17 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
   void _annotateMember(Member member) {
     if (_typeFlowAnalysis.isMemberUsed(member)) {
       if (member is Field) {
-        _setInferredType(member, _typeFlowAnalysis.fieldType(member));
+        _setInferredType(member, _typeFlowAnalysis.fieldType(member),
+            skipCheck: _typeFlowAnalysis.fieldSkipCheck(member));
       } else {
         Args<Type> argTypes = _typeFlowAnalysis.argumentTypes(member);
         assertx(argTypes != null);
 
-        final int firstParamIndex = hasReceiverArg(member) ? 1 : 0;
+        final skipCheckParams = new Set<VariableDeclaration>.from(
+            _typeFlowAnalysis.skipCheckParams(member));
+
+        final int firstParamIndex =
+            numTypeParams(member) + (hasReceiverArg(member) ? 1 : 0);
 
         final positionalParams = member.function.positionalParameters;
         assertx(argTypes.positionalCount ==
@@ -195,7 +211,8 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
 
         for (int i = 0; i < positionalParams.length; i++) {
           _setInferredType(
-              positionalParams[i], argTypes.values[firstParamIndex + i]);
+              positionalParams[i], argTypes.values[firstParamIndex + i],
+              skipCheck: skipCheckParams.contains(positionalParams[i]));
         }
 
         // TODO(dartbug.com/32292): make sure parameters are sorted in kernel
@@ -205,7 +222,8 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
           final param = findNamedParameter(member.function, names[i]);
           assertx(param != null);
           _setInferredType(param,
-              argTypes.values[firstParamIndex + positionalParams.length + i]);
+              argTypes.values[firstParamIndex + positionalParams.length + i],
+              skipCheck: skipCheckParams.contains(param));
         }
 
         // TODO(alexmarkov): figure out how to pass receiver type.
