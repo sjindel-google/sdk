@@ -810,7 +810,7 @@ class _ClassData extends _DependencyTracker implements ClassId<_ClassData> {
 
   ConcreteType _concreteType;
   ConcreteType get concreteType =>
-      _concreteType ??= new ConcreteType(this, class_.rawType);
+      _concreteType ??= new ConcreteType(this, class_.rawType, null);
 
   Type _specializedConeType;
   Type get specializedConeType =>

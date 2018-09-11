@@ -155,6 +155,29 @@ class _SummaryNormalizer extends StatementVisitor {
       }
     }
   }
+
+  @override
+  void visitInstantiate(Instantiate expr) {
+    for (int i = 0; i < expr.typeArgs.length; ++i) {
+      expr.typeArgs[i] = _normalizeExpr(expr.typeArgs[i], true);
+      if (_inLoop) return;
+    }
+  }
+
+  @override
+  void visitInstantiateType(InstantiateType expr) {
+    for (int i = 0; i < expr.typeArgs.length; ++i) {
+      expr.typeArgs[i] = _normalizeExpr(expr.typeArgs[i], true);
+      if (_inLoop) return;
+    }
+  }
+
+  @override
+  void visitTypeCheck(TypeCheck expr) {
+    expr.arg = _normalizeExpr(expr.arg, true);
+    if (_inLoop) return;
+    expr.type = _normalizeExpr(expr.type, true);
+  }
 }
 
 /// Detects whether the control flow can pass through the function body and
@@ -256,6 +279,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   Join _returnValue;
   Parameter _receiver;
   ConstantAllocationCollector constantAllocationCollector;
+  List<TypeExpr> _classTypeVariables;
+  Member _member;
 
   SummaryCollector(this.target, this._environment, this._entryPointsListener,
       this._nativeCodeOracle) {
@@ -269,8 +294,16 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     _variables = <VariableDeclaration, Join>{};
     _returnValue = null;
     _receiver = null;
+    _member = member;
 
     final hasReceiver = hasReceiverArg(member);
+
+    if (hasReceiver) {
+      _classTypeVariables = new List<TypeExpr>(
+          numFlattenedTypeArguments(member.enclosingClass));
+    } else {
+      _classTypeVariables = null;
+    }
 
     if (member is Field) {
       if (hasReceiver) {
@@ -610,8 +643,27 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   @override
   TypeExpr visitConstructorInvocation(ConstructorInvocation node) {
-    final receiver =
+    ConcreteType klass =
         _entryPointsListener.addAllocatedClass(node.constructedType.classNode);
+
+    TypeExpr receiver;
+    if (node.arguments.types.length != 0) {
+      final translator = new TypeSetTranslator(
+          _member.enclosingClass, _summary, _receiver, _classTypeVariables);
+      List<DartType> flattenedTypes = flattenInstantiatorTypeArguments(
+          klass.getConcreteClass(null), node.arguments.types);
+      final flattenedTypeArguments =
+          flattenedTypes.map(translator.process).toList();
+      if (flattenedTypeArguments.every((t) => t is Type)) {
+        receiver = new ConcreteType(klass.classId, klass.dartType,
+            flattenedTypeArguments.whereType<Type>().toList());
+      } else {
+        receiver = new Instantiate(klass, flattenedTypeArguments);
+        _summary.add(receiver);
+      }
+    } else {
+      receiver = klass;
+    }
 
     final args = _visitArguments(receiver, node.arguments);
     _makeCall(node, new DirectSelector(node.target), args);
@@ -1202,6 +1254,79 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   }
 }
 
+class TypeSetTranslator extends DartTypeVisitor {
+  Class enclosingClass;
+  Summary summary;
+  final List<TypeExpr> classTypeVariables;
+  final TypeExpr receiver;
+
+  TypeSetTranslator(this.enclosingClass, this.summary, this.receiver,
+      this.classTypeVariables) {
+    assert((receiver == null) == (classTypeVariables == null));
+    assertx(classTypeVariables == null ||
+        classTypeVariables.length == numFlattenedTypeArguments(enclosingClass));
+  }
+
+  // Creates a TypeExpr representing the set of types which can flow through a
+  // given DartType.
+  TypeExpr process(DartType type) {
+    final result = _visit(type);
+    return result == null
+        ? AnyType()
+        : result is DartType ? new SingleType(result) : result;
+  }
+
+  _visit(DartType type) => type.accept(this);
+
+  @override
+  visitDynamicType(DynamicType type) => type;
+
+  @override
+  visitVoidType(VoidType type) => type;
+
+  @override
+  visitBottomType(BottomType type) => type;
+
+  @override
+  visitInterfaceType(InterfaceType type) {
+    final args = type.typeArguments.map(_visit);
+    if (args.any((t) => t == null)) return null;
+    if (args.any((t) => t is TypeExpr)) {
+      final result = InstantiateType(
+          new InterfaceType(type.classNode),
+          args
+              .map((t) => t is DartType ? new SingleType(t) : t as TypeExpr)
+              .toList());
+      summary.add(result);
+      return result;
+    } else {
+      assertx(args.every((t) => t is DartType));
+      return new InterfaceType(
+          type.classNode, args.whereType<DartType>().toList());
+    }
+  }
+
+  @override
+  visitTypedefType(TypedefType node) => _visit(node.unalias);
+
+  @override
+  visitTypeParameterType(TypeParameterType type) {
+    if (type.parameter.parent is! Class) return null;
+    assertx(classTypeVariables != null);
+    final index = _typeParameterIndex(type.parameter);
+    assertx(index <= numFlattenedTypeArguments(type.parameter.parent));
+    if (classTypeVariables[index] != null) {
+      return classTypeVariables[index];
+    } else {
+      assertx(receiver != null);
+      final extract = new Extract(receiver, index, type.parameter.parent);
+      summary.add(extract);
+      classTypeVariables[index] = extract;
+      return extract;
+    }
+  }
+}
+
 class EmptyEntryPointsListener implements EntryPointsListener {
   final Map<Class, IntClassId> _classIds = <Class, IntClassId>{};
   int _classIdCounter = 0;
@@ -1215,7 +1340,7 @@ class EmptyEntryPointsListener implements EntryPointsListener {
   @override
   ConcreteType addAllocatedClass(Class c) {
     final classId = (_classIds[c] ??= new IntClassId(++_classIdCounter));
-    return new ConcreteType(classId, c.rawType);
+    return new ConcreteType(classId, c.rawType, null);
   }
 }
 
@@ -1330,4 +1455,15 @@ class ConstantAllocationCollector extends ConstantVisitor<Type> {
   Type visitTypeLiteralConstant(TypeLiteralConstant constant) {
     return new Type.cone(constant.getType(summaryCollector._environment));
   }
+}
+
+int _typeParameterIndex(TypeParameter param) {
+  final parent = param.parent;
+  assertx(parent is Class);
+  Class klass = parent;
+  int index = klass.typeParameters.indexOf(param);
+  if (klass.supertype != null) {
+    index += numFlattenedTypeArguments(klass.supertype.classNode);
+  }
+  return index;
 }

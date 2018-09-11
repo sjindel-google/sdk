@@ -55,6 +55,10 @@ class StatementVisitor {
   void visitJoin(Join expr) => visitDefault(expr);
   void visitUse(Use expr) => visitDefault(expr);
   void visitCall(Call expr) => visitDefault(expr);
+  void visitExtract(Extract expr) => visitDefault(expr);
+  void visitInstantiate(Instantiate expr) => visitDefault(expr);
+  void visitInstantiateType(InstantiateType expr) => visitDefault(expr);
+  void visitTypeCheck(TypeCheck expr) => visitDefault(expr);
 }
 
 /// Input parameter of the summary.
@@ -258,6 +262,122 @@ class Call extends Statement {
     assertx(result.isSpecialized);
     _resultType = _resultType.union(result, typeHierarchy);
     assertx(_resultType.isSpecialized);
+  }
+}
+
+class Extract extends Statement {
+  TypeExpr arg;
+  int paramIndex;
+  Class referenceClass;
+
+  Extract(this.arg, this.paramIndex, this.referenceClass);
+
+  @override
+  void accept(StatementVisitor visitor) => visitor.visitExtract(this);
+
+  @override
+  String dump() => "$label = _Extract ($arg[$referenceClass/$paramIndex])";
+
+  @override
+  Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
+      CallHandler callHandler) {
+    Type argType = arg.getComputedType(computedTypes);
+    return argType is ConcreteType
+        ? argType.typeArgAt(paramIndex)
+        : const AnyType();
+  }
+}
+
+class Instantiate extends Statement {
+  ConcreteType type;
+  List<TypeExpr> typeArgs;
+
+  Instantiate(this.type, this.typeArgs) {
+    assertx(type.typeArgs == null);
+  }
+
+  @override
+  void accept(StatementVisitor visitor) => visitor.visitInstantiate(this);
+
+  @override
+  String dump() =>
+      "$label = _Instantiate (${type.getConcreteClass(null)} @ $typeArgs)";
+
+  @override
+  Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
+      CallHandler callHandler) {
+    bool hasSingleType = false;
+    final types = new List<Type>(typeArgs.length);
+    for (int i = 0; i < types.length; ++i) {
+      final computed = typeArgs[i].getComputedType(computedTypes);
+      assertx(computed is SingleType || computed is AnyType);
+      if (computed is SingleType) hasSingleType = true;
+      types[i] = computed;
+    }
+    return new ConcreteType(
+        type.classId, type.dartType, hasSingleType ? types : null);
+  }
+}
+
+class InstantiateType extends Statement {
+  InterfaceType type;
+  List<TypeExpr> typeArgs;
+
+  InstantiateType(this.type, this.typeArgs) {
+    assertx(type.typeArguments.every((t) => t is DynamicType));
+    assertx(typeArgs.length == type.classNode.typeParameters.length);
+  }
+
+  @override
+  void accept(StatementVisitor visitor) => visitor.visitInstantiateType(this);
+
+  @override
+  String dump() => "$label = _InstantiateType ($type @ [$typeArgs])";
+
+  @override
+  Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
+      CallHandler callHandler) {
+    List<DartType> types;
+    for (final arg in typeArgs) {
+      final argType = arg.getComputedType(computedTypes);
+      if (argType is AnyType) {
+        return const AnyType();
+      } else if (argType is SingleType) {
+        types.add(argType.type);
+      } else {
+        assertx(argType is AnyType || argType is SingleType);
+      }
+    }
+    return new SingleType(new InterfaceType(type.classNode, types));
+  }
+}
+
+class TypeCheck extends Statement {
+  TypeExpr arg;
+  TypeExpr type;
+
+  TypeCheck(this.arg, this.type);
+
+  @override
+  void accept(StatementVisitor visitor) => visitor.visitTypeCheck(this);
+
+  @override
+  String dump() => "$label = _TypeCheck ($arg against $type)";
+
+  @override
+  Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
+      CallHandler callHandler) {
+    Type argType = arg.getComputedType(computedTypes);
+    Type checkType = type.getComputedType(computedTypes);
+    if (checkType is AnyType) {
+      return argType;
+    } else if (checkType is SingleType) {
+      return argType.intersection(
+          Type.fromStatic(checkType.type), typeHierarchy);
+    } else {
+      assertx(false, details: "Can only TypeCheck against type set.");
+      return null;
+    }
   }
 }
 

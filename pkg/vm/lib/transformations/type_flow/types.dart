@@ -118,6 +118,7 @@ abstract class Type extends TypeExpr {
 
 /// Order of precedence between types for evaluation of union/intersection.
 enum TypeOrder {
+  SingleType,
   Empty,
   Nullable,
   Any,
@@ -212,6 +213,7 @@ class NullableType extends Type {
 
 /// Type representing any instance except `null`.
 /// Semantically equivalent to ConeType of Object, but more efficient.
+/// Can also represent a set of types, the set of all types.
 class AnyType extends Type {
   const AnyType();
 
@@ -263,7 +265,7 @@ class SetType extends Type {
   int _computeHashCode() {
     int hash = 1237;
     for (var t in types) {
-      hash = (((hash * 31) & kHashMask) + t.classId.hashCode) & kHashMask;
+      hash = (((hash * 31) & kHashMask) + t.hashCode) & kHashMask;
     }
     return hash;
   }
@@ -272,7 +274,7 @@ class SetType extends Type {
   bool operator ==(other) {
     if ((other is SetType) && (types.length == other.types.length)) {
       for (int i = 0; i < types.length; i++) {
-        if (types[i].classId != other.types[i].classId) {
+        if (types[i] != other.types[i]) {
           return false;
         }
       }
@@ -307,8 +309,12 @@ class SetType extends Type {
         types.add(t2);
         ++i2;
       } else {
-        assertx(t1 == t2);
-        types.add(t1);
+        if (t1 == t2) {
+          types.add(t1);
+        } else {
+          // SAMIR_TODO: merge the type arguments sets
+          types.add(t1.raw);
+        }
         ++i1;
         ++i2;
       }
@@ -335,8 +341,14 @@ class SetType extends Type {
       } else if (relation > 0) {
         ++i2;
       } else {
-        assertx(t1 == t2);
-        types.add(t1);
+        if (t1.typeArgs == null && t2.typeArgs == null) {
+          types.add(t1);
+        } else {
+          final intersect = t1.intersection(t2, null);
+          if (intersect is! EmptyType) {
+            types.add(intersect);
+          }
+        }
         ++i1;
         ++i2;
       }
@@ -503,37 +515,87 @@ class IntClassId extends ClassId<IntClassId> {
 /// or `null` object).
 class ConcreteType extends Type implements Comparable<ConcreteType> {
   final ClassId classId;
-  final DartType dartType;
+  final InterfaceType dartType;
+  int _hashCode;
 
-  ConcreteType(this.classId, this.dartType) {
-    // TODO(alexmarkov): support generics & closures
-    assertx(dartType is InterfaceType);
-    assertx(!(dartType as InterfaceType).classNode.isAbstract);
-    assertx((dartType as InterfaceType)
-        .typeArguments
-        .every((t) => t == const DynamicType()));
+  // May be null if there are no type arguments constraints. Individual
+  // components may also be null if there is no constraint on the corresponding
+  // type parameter. The type arguments should represent type sets, i.e.
+  // `AnyType` or `SingleType`. The type arguments vector is flattened against
+  // the class hierarchy.
+  final List<Type> typeArgs;
+
+  ConcreteType(this.classId, this.dartType, this.typeArgs) {
+    // TODO(alexmarkov): support closures
+    assertx(!dartType.classNode.isAbstract);
+    assertx(typeArgs == null ||
+        typeArgs.length == numFlattenedTypeArguments(dartType.classNode));
+  }
+
+  ConcreteType get raw => new ConcreteType(classId, dartType, null);
+
+  Type typeArgAt(int i) {
+    return typeArgs == null ? const AnyType() : typeArgs[i];
   }
 
   @override
-  Class getConcreteClass(TypeHierarchy typeHierarchy) =>
-      (dartType as InterfaceType).classNode;
+  Class getConcreteClass(TypeHierarchy typeHierarchy) => dartType.classNode;
 
   @override
-  bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) =>
-      typeHierarchy.isSubtype(this.dartType, dartType);
+  bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) {
+    if (typeArgs == null) {
+      return typeHierarchy.isSubtype(this.dartType, dartType);
+    } else {
+      // TODO(sjindel): Take type arguments into account.
+      return false;
+    }
+  }
 
   @override
-  int get hashCode => (classId.hashCode ^ 0x1234) & kHashMask;
+  int get hashCode => _hashCode ??= _computeHashCode();
+
+  int _computeHashCode() {
+    int hash = classId.hashCode ^ 0x1234 & kHashMask;
+    if (typeArgs == null) return hash;
+    for (var t in typeArgs) {
+      hash = (((hash * 31) & kHashMask) + t.hashCode) & kHashMask;
+    }
+    return hash;
+  }
 
   @override
-  bool operator ==(other) =>
-      (other is ConcreteType) && (this.classId == other.classId);
+  bool operator ==(other) {
+    if (other is ConcreteType) {
+      if (this.classId != other.classId ||
+          (this.typeArgs == null) != (other.typeArgs == null)) {
+        return false;
+      }
+      if (this.typeArgs != null) {
+        for (int i = 0; i < this.typeArgs.length; ++i) {
+          if (this.typeArgs[i] != other.typeArgs[i]) {
+            return false;
+          }
+        }
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
 
+  // Note that this may return 0 for concrete types which are not equal if the
+  // difference is only in type arguments.
   @override
   int compareTo(ConcreteType other) => classId.compareTo(other.classId);
 
   @override
-  String toString() => "_T (${dartType})";
+  String toString() {
+    if (typeArgs == null) {
+      return "_T (${dartType})";
+    } else {
+      return "_T (${dartType.classNode}<${typeArgs.join(', ')}>)";
+    }
+  }
 
   @override
   int get order => TypeOrder.Concrete.index;
@@ -546,13 +608,13 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
     if (other is ConcreteType) {
       if (this == other) {
         return this;
-      } else {
-        assertx(this.classId != other.classId);
-        final List<ConcreteType> types =
-            (this.classId.compareTo(other.classId) < 0)
-                ? <ConcreteType>[this, other]
-                : <ConcreteType>[other, this];
+      } else if (this.classId != other.classId) {
+        final types = (this.classId.compareTo(other.classId) < 0)
+            ? <ConcreteType>[this, other]
+            : <ConcreteType>[other, this];
         return new SetType(types);
+      } else {
+        return raw;
       }
     } else {
       throw 'Unexpected type $other';
@@ -567,11 +629,87 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
     if (other is ConcreteType) {
       if (this == other) {
         return this;
-      } else {
-        return const EmptyType();
       }
+      if (this.classId != other.classId) {
+        return EmptyType();
+      }
+      assertx(typeArgs != null || other.typeArgs != null);
+      if (typeArgs == null) {
+        return other;
+      } else if (other.typeArgs == null) {
+        return this;
+      }
+
+      final mergedTypeArgs = new List<Type>(typeArgs.length);
+      bool isEmpty = false;
+      bool hasSingleType = false;
+      for (int i = 0; i < typeArgs.length; ++i) {
+        final merged =
+            typeArgs[i].intersection(other.typeArgs[i], typeHierarchy);
+        if (merged is EmptyType) {
+          isEmpty = true;
+          break;
+        } else if (merged is SingleType) {
+          hasSingleType = true;
+        }
+        mergedTypeArgs.add(merged);
+      }
+      return isEmpty
+          ? EmptyType()
+          : hasSingleType
+              ? new ConcreteType(classId, dartType, mergedTypeArgs)
+              : raw;
     } else {
       throw 'Unexpected type $other';
     }
   }
+}
+
+class SingleType extends Type {
+  final DartType type;
+
+  const SingleType(this.type);
+
+  int get order => TypeOrder.SingleType.index;
+
+  @override
+  int get hashCode => type.hashCode;
+
+  @override
+  operator ==(other) => other is SingleType && other.type == type;
+
+  @override
+  String toString() => "_TS (${type})";
+
+  @override
+  bool get isSpecialized =>
+      throw "ERROR: SingleType does not support isSpecialized.";
+
+  @override
+  bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) =>
+      throw "ERROR: SingleType does not support isSubtypeOf.";
+
+  @override
+  Type union(Type other, TypeHierarchy typeHierarchy) =>
+      throw "ERROR: SingleType does not support union.";
+
+  @override
+  Type intersection(Type other, TypeHierarchy typeHierarchy) {
+    if (other is AnyType) {
+      return this;
+    } else if (other is SingleType) {
+      return this == other ? this : const EmptyType();
+    }
+    assertx(false,
+        details:
+            "ERROR: SingleType cannot intersect with ${other.runtimeType}");
+  }
+
+  @override
+  Type specialize(TypeHierarchy typeHierarchy) =>
+      throw "ERROR: SingleType does not support specialize.";
+
+  @override
+  Class getConcreteClass(TypeHierarchy typeHierarchy) =>
+      throw "ERROR: ConcreteClass does not support getConcreteClass.";
 }

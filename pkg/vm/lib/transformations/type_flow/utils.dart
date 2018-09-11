@@ -7,7 +7,15 @@
 library vm.transformations.type_flow.utils;
 
 import 'package:kernel/ast.dart'
-    show Constructor, FunctionNode, Member, VariableDeclaration;
+    show
+        Class,
+        Constructor,
+        DartType,
+        FunctionNode,
+        Member,
+        VariableDeclaration;
+
+import 'package:kernel/type_algebra.dart' show Substitution;
 
 const bool kPrintTrace =
     const bool.fromEnvironment('global.type.flow.print.trace');
@@ -147,4 +155,31 @@ class Statistics {
     ${throwExpressionsPruned} throw expressions pruned
     """);
   }
+}
+
+List<DartType> flattenInstantiatorTypeArguments(
+    Class instantiatedClass, List<DartType> typeArgs) {
+  assert(typeArgs.length == instantiatedClass.typeParameters.length);
+
+  List<DartType> flatTypeArgs;
+  final supertype = instantiatedClass.supertype;
+  if (supertype == null) {
+    flatTypeArgs = <DartType>[];
+  } else {
+    final substitution =
+        Substitution.fromPairs(instantiatedClass.typeParameters, typeArgs);
+    flatTypeArgs = flattenInstantiatorTypeArguments(supertype.classNode,
+        substitution.substituteSupertype(supertype).typeArguments);
+  }
+  flatTypeArgs.addAll(typeArgs);
+  return flatTypeArgs;
+}
+
+int numFlattenedTypeArguments(Class klass) {
+  int sum = 0;
+  while (klass != null) {
+    sum += klass.typeParameters.length;
+    klass = klass.superclass;
+  }
+  return sum;
 }
