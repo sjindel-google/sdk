@@ -14,11 +14,27 @@ class InferredType {
   static const int flagNullable = 1 << 0;
   static const int flagInt = 1 << 1;
 
-  InferredType(Class concreteClass, bool nullable, bool isInt)
-      : this._byReference(getClassReference(concreteClass),
-            (nullable ? flagNullable : 0) | (isInt ? flagInt : 0));
+  // Entire list may be null if no type arguments were inferred.
+  // Will always be null if `concreteClass` is null.
+  //
+  // Each component may be null if that particular type argument was not
+  // inferred.
+  //
+  // Otherwise, a non-null type argument indicates that that particular type
+  // argument (in the runtime type) is always exactly a particular `DartType`.
+  final List<DartType> exactTypeArguments;
 
-  InferredType._byReference(this._concreteClassReference, this._flags);
+  InferredType(Class concreteClass, bool nullable, bool isInt,
+      {List<DartType> exactTypeArguments})
+      : this._byReference(
+            getClassReference(concreteClass),
+            (nullable ? flagNullable : 0) | (isInt ? flagInt : 0),
+            exactTypeArguments);
+
+  InferredType._byReference(
+      this._concreteClassReference, this._flags, this.exactTypeArguments) {
+    assert(exactTypeArguments == null || _concreteClassReference != null);
+  }
 
   Class get concreteClass => _concreteClassReference?.asClass;
 
@@ -26,8 +42,18 @@ class InferredType {
   bool get isInt => (_flags & flagInt) != 0;
 
   @override
-  String toString() =>
-      "${concreteClass != null ? concreteClass : (isInt ? 'int' : '!')}${nullable ? '?' : ''}";
+  String toString() {
+    final base =
+        "${concreteClass != null ? concreteClass : (isInt ? 'int' : '!')}";
+    final suffix = "${nullable ? '?' : ''}";
+    String typeArgs = "";
+    if (exactTypeArguments != null) {
+      typeArgs =
+          exactTypeArguments.map((t) => t != null ? "$t" : "?").join(", ");
+      typeArgs = "<" + typeArgs + ">";
+    }
+    return base + suffix + typeArgs;
+  }
 }
 
 /// Repository for [InferredType].
@@ -40,6 +66,7 @@ class InferredTypeMetadataRepository extends MetadataRepository<InferredType> {
 
   @override
   void writeToBinary(InferredType metadata, Node node, BinarySink sink) {
+    // SAMIR_TODO
     sink.writeCanonicalNameReference(
         getCanonicalNameOfClass(metadata.concreteClass));
     sink.writeByte(metadata._flags);
@@ -47,9 +74,10 @@ class InferredTypeMetadataRepository extends MetadataRepository<InferredType> {
 
   @override
   InferredType readFromBinary(Node node, BinarySource source) {
+    // SAMIR_TODO
     final concreteClassReference =
         source.readCanonicalNameReference()?.getReference();
     final flags = source.readByte();
-    return new InferredType._byReference(concreteClassReference, flags);
+    return new InferredType._byReference(concreteClassReference, flags, null);
   }
 }

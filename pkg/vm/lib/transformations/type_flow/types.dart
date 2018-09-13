@@ -530,6 +530,7 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
     assertx(!dartType.classNode.isAbstract);
     assertx(typeArgs == null ||
         typeArgs.length == numFlattenedTypeArguments(dartType.classNode));
+    assertx(typeArgs == null || typeArgs.any((t) => t is! AnyType));
   }
 
   ConcreteType get raw => new ConcreteType(classId, dartType, null);
@@ -700,9 +701,7 @@ class SingleType extends Type {
     } else if (other is SingleType) {
       return this == other ? this : const EmptyType();
     }
-    assertx(false,
-        details:
-            "ERROR: SingleType cannot intersect with ${other.runtimeType}");
+    throw "ERROR: SingleType cannot intersect with ${other.runtimeType}";
   }
 
   @override

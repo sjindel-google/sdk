@@ -147,8 +147,18 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
       }
     }
 
+    List<DartType> typeArgs;
+    if (type is ConcreteType && type.typeArgs != null) {
+      typeArgs = type.typeArgs
+          .getRange(type.typeArgs.length - concreteClass.typeParameters.length,
+              type.typeArgs.length)
+          .map((t) => t is AnyType ? null : (t as SingleType).type)
+          .toList();
+    }
+
     if ((concreteClass != null) || !nullable || isInt) {
-      return new InferredType(concreteClass, nullable, isInt);
+      return new InferredType(concreteClass, nullable, isInt,
+          exactTypeArguments: typeArgs);
     }
 
     return null;

@@ -651,7 +651,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     int flattenedLength = flattenedTypes.length;
     List<Type> types = new List(flattenedLength);
     List<TypeExpr> typeExprs = new List(flattenedLength);
-    bool allAnyType = false;
+    bool allAnyType = true;
     for (int i = 0; i < flattenedLength; ++i) {
       TypeExpr arg = translator.process(flattenedTypes[i]);
       typeExprs[i] = arg;
@@ -660,6 +660,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         allAnyType = allAnyType && arg is AnyType;
       } else {
         types = null;
+        allAnyType = false;
       }
     }
     if (allAnyType) {
