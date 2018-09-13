@@ -692,7 +692,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   @override
   TypeExpr visitListLiteral(ListLiteral node) {
     node.expressions.forEach(_visit);
-    // TODO(alexmarkov): concrete type
     Class concreteClass =
         target.concreteListLiteralType(_environment.coreTypes);
     return concreteClass != null
