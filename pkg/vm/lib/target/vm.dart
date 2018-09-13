@@ -22,6 +22,8 @@ class VmTarget extends Target {
 
   Class _growableList;
   Class _immutableList;
+  Class _internalLinkedHashMap;
+  Class _immutableMap;
 
   VmTarget(this.flags);
 
@@ -304,5 +306,15 @@ class VmTarget extends Target {
   @override
   Class concreteConstListLiteralType(CoreTypes coreTypes) {
     return _immutableList ??= coreTypes.index.getClass('dart:core', '_ImmutableList');
+  }
+
+  @override
+  Class concreteMapLiteralType(CoreTypes coreTypes) {
+    return _internalLinkedHashMap ??= coreTypes.index.getClass('dart:collection', '_InternalLinkedHashMap');
+  }
+
+  @override
+  Class concreteConstMapLiteralType(CoreTypes coreTypes) {
+    return _immutableMap ??= coreTypes.index.getClass('dart:core', '_ImmutableMap');
   }
 }

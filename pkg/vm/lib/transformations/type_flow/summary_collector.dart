@@ -713,8 +713,11 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       _visit(entry.key);
       _visit(entry.value);
     }
-    // TODO(alexmarkov): concrete type
-    return _staticType(node);
+    Class concreteClass =
+        target.concreteMapLiteralType(_environment.coreTypes);
+    return concreteClass != null
+        ? _entryPointsListener.addAllocatedClass(concreteClass)
+        : _staticType(node);
   }
 
   @override

@@ -197,6 +197,9 @@ abstract class Target {
 
   Class concreteListLiteralType(CoreTypes coreTypes) => null;
   Class concreteConstListLiteralType(CoreTypes coreTypes) => null;
+
+  Class concreteMapLiteralType(CoreTypes coreTypes) => null;
+  Class concreteConstMapLiteralType(CoreTypes coreTypes) => null;
 }
 
 class NoneTarget extends Target {
