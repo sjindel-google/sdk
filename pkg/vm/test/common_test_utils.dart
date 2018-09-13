@@ -26,10 +26,10 @@ class TestingVmTarget extends VmTarget {
 }
 
 Future<Component> compileTestCaseToKernelProgram(Uri sourceUri,
-    {bool enableSuperMixins: false}) async {
+    {Target target, bool enableSuperMixins: false}) async {
   final platformKernel =
       computePlatformBinariesLocation().resolve('vm_platform_strong.dill');
-  final target = new TestingVmTarget(new TargetFlags(strongMode: true))
+  target ??= new TestingVmTarget(new TargetFlags(strongMode: true))
     ..enableSuperMixins = enableSuperMixins;
   final options = new CompilerOptions()
     ..strongMode = true

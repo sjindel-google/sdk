@@ -7,6 +7,7 @@ library vm.transformations.type_flow.summary_collector;
 
 import 'dart:core' hide Type;
 
+import 'package:kernel/target/targets.dart';
 import 'package:kernel/ast.dart' hide Statement, StatementVisitor;
 import 'package:kernel/ast.dart' as ast show Statement, StatementVisitor;
 import 'package:kernel/type_environment.dart' show TypeEnvironment;
@@ -242,6 +243,7 @@ class _FallthroughDetector extends ast.StatementVisitor<bool> {
 
 /// Create a type flow summary for a member from the kernel AST.
 class SummaryCollector extends RecursiveVisitor<TypeExpr> {
+  final Target target;
   final TypeEnvironment _environment;
   final EntryPointsListener _entryPointsListener;
   final NativeCodeOracle _nativeCodeOracle;
@@ -255,8 +257,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   Parameter _receiver;
   ConstantAllocationCollector constantAllocationCollector;
 
-  SummaryCollector(
-      this._environment, this._entryPointsListener, this._nativeCodeOracle) {
+  SummaryCollector(this.target, this._environment, this._entryPointsListener,
+      this._nativeCodeOracle) {
     constantAllocationCollector = new ConstantAllocationCollector(this);
   }
 
@@ -691,7 +693,11 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   TypeExpr visitListLiteral(ListLiteral node) {
     node.expressions.forEach(_visit);
     // TODO(alexmarkov): concrete type
-    return _staticType(node);
+    Class concreteClass =
+        target.concreteListLiteralType(_environment.coreTypes);
+    return concreteClass != null
+        ? _entryPointsListener.addAllocatedClass(concreteClass)
+        : _staticType(node);
   }
 
   @override
@@ -1216,8 +1222,11 @@ class CreateAllSummariesVisitor extends RecursiveVisitor<Null> {
   final SummaryCollector _summaryColector;
 
   CreateAllSummariesVisitor(this._environment)
-      : _summaryColector = new SummaryCollector(_environment,
-            new EmptyEntryPointsListener(), new NativeCodeOracle(null, null));
+      : _summaryColector = new SummaryCollector(
+            new NoneTarget(new TargetFlags(strongMode: true)),
+            _environment,
+            new EmptyEntryPointsListener(),
+            new NativeCodeOracle(null, null));
 
   @override
   defaultMember(Member m) {
@@ -1285,7 +1294,11 @@ class ConstantAllocationCollector extends ConstantVisitor<Type> {
     for (final Constant entry in constant.entries) {
       typeFor(entry);
     }
-    return new Type.cone(constant.getType(summaryCollector._environment));
+    Class concreteClass = summaryCollector.target
+        .concreteConstListLiteralType(summaryCollector._environment.coreTypes);
+    return concreteClass != null
+        ? summaryCollector._entryPointsListener.addAllocatedClass(concreteClass)
+        : new Type.cone(constant.getType(summaryCollector._environment));
   }
 
   @override
