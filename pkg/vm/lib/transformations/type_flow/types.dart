@@ -312,7 +312,8 @@ class SetType extends Type {
         if (t1 == t2) {
           types.add(t1);
         } else {
-          // SAMIR_TODO: merge the type arguments sets
+          // TODO(sjindel/tfa): Merge the type arguments vectors.
+          // (e.g., Map<?, int> vs Map<String, int> can become Map<?, int>)
           types.add(t1.raw);
         }
         ++i1;

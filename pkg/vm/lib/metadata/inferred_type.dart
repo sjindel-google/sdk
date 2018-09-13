@@ -66,7 +66,8 @@ class InferredTypeMetadataRepository extends MetadataRepository<InferredType> {
 
   @override
   void writeToBinary(InferredType metadata, Node node, BinarySink sink) {
-    // SAMIR_TODO
+    // TODO(sjindel/tfa): Implement serialization of type arguments when can use
+    // them for optimizations.
     sink.writeCanonicalNameReference(
         getCanonicalNameOfClass(metadata.concreteClass));
     sink.writeByte(metadata._flags);
@@ -74,7 +75,8 @@ class InferredTypeMetadataRepository extends MetadataRepository<InferredType> {
 
   @override
   InferredType readFromBinary(Node node, BinarySource source) {
-    // SAMIR_TODO
+    // TODO(sjindel/tfa): Implement serialization of type arguments when can use
+    // them for optimizations.
     final concreteClassReference =
         source.readCanonicalNameReference()?.getReference();
     final flags = source.readByte();
