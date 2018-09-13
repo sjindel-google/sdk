@@ -11,6 +11,10 @@ class E<S, T> extends C<T> {
 }
 
 main() {
-  C<int>().foo();
-  E<int, String>().foo();
+  dynamic used;
+  used = C<int>().foo();
+  used = E<int, String>().foo();
+  used = E<int, String>().bar();
+  used = E<int, String>().baz();
+  return used;
 }
