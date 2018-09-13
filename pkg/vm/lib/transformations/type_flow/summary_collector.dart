@@ -693,7 +693,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   TypeExpr visitListLiteral(ListLiteral node) {
     node.expressions.forEach(_visit);
     Class concreteClass =
-        target.concreteListLiteralType(_environment.coreTypes);
+        target.concreteListLiteralClass(_environment.coreTypes);
     return concreteClass != null
         ? _entryPointsListener.addAllocatedClass(concreteClass)
         : _staticType(node);
@@ -712,7 +712,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       _visit(entry.key);
       _visit(entry.value);
     }
-    Class concreteClass = target.concreteMapLiteralType(_environment.coreTypes);
+    Class concreteClass =
+        target.concreteMapLiteralClass(_environment.coreTypes);
     return concreteClass != null
         ? _entryPointsListener.addAllocatedClass(concreteClass)
         : _staticType(node);
@@ -1222,12 +1223,9 @@ class CreateAllSummariesVisitor extends RecursiveVisitor<Null> {
   final TypeEnvironment _environment;
   final SummaryCollector _summaryColector;
 
-  CreateAllSummariesVisitor(this._environment)
-      : _summaryColector = new SummaryCollector(
-            new NoneTarget(new TargetFlags(strongMode: true)),
-            _environment,
-            new EmptyEntryPointsListener(),
-            new NativeCodeOracle(null, null));
+  CreateAllSummariesVisitor(Target target, this._environment)
+      : _summaryColector = new SummaryCollector(target, _environment,
+            new EmptyEntryPointsListener(), new NativeCodeOracle(null, null));
 
   @override
   defaultMember(Member m) {
@@ -1296,7 +1294,7 @@ class ConstantAllocationCollector extends ConstantVisitor<Type> {
       typeFor(entry);
     }
     Class concreteClass = summaryCollector.target
-        .concreteConstListLiteralType(summaryCollector._environment.coreTypes);
+        .concreteConstListLiteralClass(summaryCollector._environment.coreTypes);
     return concreteClass != null
         ? summaryCollector._entryPointsListener.addAllocatedClass(concreteClass)
         : new Type.cone(constant.getType(summaryCollector._environment));

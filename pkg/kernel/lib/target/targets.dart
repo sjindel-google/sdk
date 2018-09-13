@@ -195,11 +195,11 @@ abstract class Target {
 
   String toString() => 'Target($name)';
 
-  Class concreteListLiteralType(CoreTypes coreTypes) => null;
-  Class concreteConstListLiteralType(CoreTypes coreTypes) => null;
+  Class concreteListLiteralClass(CoreTypes coreTypes) => null;
+  Class concreteConstListLiteralClass(CoreTypes coreTypes) => null;
 
-  Class concreteMapLiteralType(CoreTypes coreTypes) => null;
-  Class concreteConstMapLiteralType(CoreTypes coreTypes) => null;
+  Class concreteMapLiteralClass(CoreTypes coreTypes) => null;
+  Class concreteConstMapLiteralClass(CoreTypes coreTypes) => null;
 }
 
 class NoneTarget extends Target {

@@ -18,8 +18,7 @@ import '../../common_test_utils.dart';
 final String pkgVmDir = Platform.script.resolve('../../..').toFilePath();
 
 runTestCase(Uri source) async {
-  final target = new TestingVmTarget(new TargetFlags(strongMode: true))
-    ..enableSuperMixins = false;
+  final target = new TestingVmTarget(new TargetFlags(strongMode: true));
   Component component =
       await compileTestCaseToKernelProgram(source, target: target);
 

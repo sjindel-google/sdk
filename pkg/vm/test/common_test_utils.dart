@@ -22,7 +22,7 @@ class TestingVmTarget extends VmTarget {
   TestingVmTarget(TargetFlags flags) : super(flags);
 
   @override
-  bool enableSuperMixins;
+  bool enableSuperMixins = false;
 }
 
 Future<Component> compileTestCaseToKernelProgram(Uri sourceUri,

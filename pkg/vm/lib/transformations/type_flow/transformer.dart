@@ -47,7 +47,7 @@ Component transformComponent(Target target, CoreTypes coreTypes,
 
   if (kDumpAllSummaries) {
     Statistics.reset();
-    new CreateAllSummariesVisitor(types).visitComponent(component);
+    new CreateAllSummariesVisitor(target, types).visitComponent(component);
     Statistics.print("All summaries statistics");
   }
 

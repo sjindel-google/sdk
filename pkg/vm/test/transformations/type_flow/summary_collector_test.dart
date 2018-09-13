@@ -47,8 +47,7 @@ class PrintSummaries extends RecursiveVisitor<Null> {
 }
 
 runTestCase(Uri source) async {
-  final Target target = new TestingVmTarget(new TargetFlags(strongMode: true))
-    ..enableSuperMixins = false;
+  final Target target = new TestingVmTarget(new TargetFlags(strongMode: true));
   final Component component = await compileTestCaseToKernelProgram(source);
   final Library library = component.mainMethod.enclosingLibrary;
   final CoreTypes coreTypes = new CoreTypes(component);
