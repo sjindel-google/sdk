@@ -299,8 +299,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     final hasReceiver = hasReceiverArg(member);
 
     if (hasReceiver) {
-      _classTypeVariables = new List<TypeExpr>(
-          numFlattenedTypeArguments(member.enclosingClass));
+      _classTypeVariables =
+          new List<TypeExpr>(numFlattenedTypeArguments(member.enclosingClass));
     } else {
       _classTypeVariables = null;
     }
@@ -641,30 +641,43 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     return _makeNarrow(v, _staticType(node));
   }
 
+  TypeExpr _instantiateConcreteClass(
+      ConcreteType type, List<DartType> typeArguments) {
+    if (typeArguments.length == 0) return type;
+    final translator = new TypeSetTranslator(
+        _member.enclosingClass, _summary, _receiver, _classTypeVariables);
+    List<DartType> flattenedTypes = flattenInstantiatorTypeArguments(
+        type.getConcreteClass(null), typeArguments);
+    int flattenedLength = flattenedTypes.length;
+    List<Type> types = new List(flattenedLength);
+    List<TypeExpr> typeExprs = new List(flattenedLength);
+    bool allAnyType = false;
+    for (int i = 0; i < flattenedLength; ++i) {
+      TypeExpr arg = translator.process(flattenedTypes[i]);
+      typeExprs[i] = arg;
+      if (types != null && arg is Type) {
+        types[i] = arg;
+        allAnyType = allAnyType && arg is AnyType;
+      } else {
+        types = null;
+      }
+    }
+    if (allAnyType) {
+      return type;
+    } else if (types != null) {
+      return new ConcreteType(type.classId, type.dartType, types);
+    } else {
+      final result = new Instantiate(type, typeExprs);
+      _summary.add(result);
+      return result;
+    }
+  }
+
   @override
   TypeExpr visitConstructorInvocation(ConstructorInvocation node) {
     ConcreteType klass =
         _entryPointsListener.addAllocatedClass(node.constructedType.classNode);
-
-    TypeExpr receiver;
-    if (node.arguments.types.length != 0) {
-      final translator = new TypeSetTranslator(
-          _member.enclosingClass, _summary, _receiver, _classTypeVariables);
-      List<DartType> flattenedTypes = flattenInstantiatorTypeArguments(
-          klass.getConcreteClass(null), node.arguments.types);
-      final flattenedTypeArguments =
-          flattenedTypes.map(translator.process).toList();
-      if (flattenedTypeArguments.every((t) => t is Type)) {
-        receiver = new ConcreteType(klass.classId, klass.dartType,
-            flattenedTypeArguments.whereType<Type>().toList());
-      } else {
-        receiver = new Instantiate(klass, flattenedTypeArguments);
-        _summary.add(receiver);
-      }
-    } else {
-      receiver = klass;
-    }
-
+    TypeExpr receiver = _instantiateConcreteClass(klass, node.arguments.types);
     final args = _visitArguments(receiver, node.arguments);
     _makeCall(node, new DirectSelector(node.target), args);
     return receiver;
@@ -746,9 +759,12 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     node.expressions.forEach(_visit);
     Class concreteClass =
         target.concreteListLiteralClass(_environment.coreTypes);
-    return concreteClass != null
-        ? _entryPointsListener.addAllocatedClass(concreteClass)
-        : _staticType(node);
+    if (concreteClass != null) {
+      return _instantiateConcreteClass(
+          _entryPointsListener.addAllocatedClass(concreteClass),
+          [node.typeArgument]);
+    }
+    return _staticType(node);
   }
 
   @override
@@ -766,9 +782,12 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     }
     Class concreteClass =
         target.concreteMapLiteralClass(_environment.coreTypes);
-    return concreteClass != null
-        ? _entryPointsListener.addAllocatedClass(concreteClass)
-        : _staticType(node);
+    if (concreteClass != null) {
+      return _instantiateConcreteClass(
+          _entryPointsListener.addAllocatedClass(concreteClass),
+          [node.keyType, node.valueType]);
+    }
+    return _staticType(node);
   }
 
   @override
