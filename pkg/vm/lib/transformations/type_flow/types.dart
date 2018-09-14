@@ -393,7 +393,13 @@ class SetType extends Type {
         return new SetType(list);
       }
     } else if (other is ConcreteType) {
-      return types.contains(other) ? other : const EmptyType();
+      for (var type in types) {
+        if (type == other) return other;
+        if (type.classId == other.classId) {
+          return type.intersection(other, typeHierarchy);
+        }
+      }
+      return EmptyType();
     } else if (other is ConeType) {
       return typeHierarchy
           .specializeTypeCone(other.dartType)
@@ -525,7 +531,7 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
   // extends B<int, T>", then the vector for "C" will have three elements.
   final List<Type> typeArgs;
 
-  ConcreteType(this.classId, this.dartType, this.typeArgs) {
+  ConcreteType(this.classId, this.dartType, [this.typeArgs]) {
     // TODO(alexmarkov): support closures
     assertx(!dartType.classNode.isAbstract);
     assertx(typeArgs == null ||
@@ -639,24 +645,20 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
       }
 
       final mergedTypeArgs = new List<Type>(typeArgs.length);
-      bool isEmpty = false;
       bool hasSingleType = false;
       for (int i = 0; i < typeArgs.length; ++i) {
         final merged =
             typeArgs[i].intersection(other.typeArgs[i], typeHierarchy);
         if (merged is EmptyType) {
-          isEmpty = true;
-          break;
+          return EmptyType();
         } else if (merged is SingleType) {
           hasSingleType = true;
         }
-        mergedTypeArgs.add(merged);
+        mergedTypeArgs[i] = merged;
       }
-      return isEmpty
-          ? EmptyType()
-          : hasSingleType
-              ? new ConcreteType(classId, dartType, mergedTypeArgs)
-              : raw;
+      return hasSingleType
+          ? new ConcreteType(classId, dartType, mergedTypeArgs)
+          : raw;
     } else {
       throw 'Unexpected type $other';
     }
