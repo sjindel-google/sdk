@@ -265,9 +265,13 @@ class Call extends Statement {
   }
 }
 
+// Extract a type argument from a ConcreteType (used to extract type arguments
+// from receivers of methods).
 class Extract extends Statement {
   TypeExpr arg;
   int paramIndex;
+
+  // Not strictly needed, but useful for debugging and asserts.
   Class referenceClass;
 
   Extract(this.arg, this.paramIndex, this.referenceClass);
@@ -288,6 +292,8 @@ class Extract extends Statement {
   }
 }
 
+// Instantiate a concrete type with type arguments. For example, used to fill in
+// "T = int" in "C<T>" to create "C<int>".
 class Instantiate extends Statement {
   ConcreteType type;
   List<TypeExpr> typeArgs;
@@ -319,6 +325,7 @@ class Instantiate extends Statement {
   }
 }
 
+// Similar to "Instantiate", but works with type sets rather than value sets.
 class InstantiateType extends Statement {
   InterfaceType type;
   List<TypeExpr> typeArgs;
@@ -332,7 +339,7 @@ class InstantiateType extends Statement {
   void accept(StatementVisitor visitor) => visitor.visitInstantiateType(this);
 
   @override
-  String dump() => "$label = _InstantiateType ($type @ [$typeArgs])";
+  String dump() => "$label = _InstantiateType ($type @ $typeArgs)";
 
   @override
   Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,

@@ -178,6 +178,11 @@ class _SummaryNormalizer extends StatementVisitor {
     if (_inLoop) return;
     expr.type = _normalizeExpr(expr.type, true);
   }
+
+  @override
+  void visitExtract(Extract expr) {
+    expr.arg = _normalizeExpr(expr.arg, true);
+  }
 }
 
 /// Detects whether the control flow can pass through the function body and
@@ -281,7 +286,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   Parameter _receiver;
   ConstantAllocationCollector constantAllocationCollector;
   List<TypeExpr> _classTypeVariables;
-  Member _member;
   TypeSetTranslator _translator;
 
   SummaryCollector(this.target, this._environment, this._entryPointsListener,
@@ -297,7 +301,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     _variables = <VariableDeclaration, TypeExpr>{};
     _returnValue = null;
     _receiver = null;
-    _member = member;
 
     final hasReceiver = hasReceiverArg(member);
 
@@ -320,7 +323,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         _summary = new Summary();
       }
       _translator = new TypeSetTranslator(
-          _member.enclosingClass, _summary, _receiver, _classTypeVariables);
+          member.enclosingClass, _summary, _receiver, _classTypeVariables);
       assertx(member.initializer != null);
       _summary.result = _visit(member.initializer);
     } else {
@@ -346,7 +349,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       }
 
       _translator = new TypeSetTranslator(
-          _member.enclosingClass, _summary, _receiver, _classTypeVariables);
+          member.enclosingClass, _summary, _receiver, _classTypeVariables);
 
       for (VariableDeclaration param in function.positionalParameters) {
         _declareParameter(param.name, param.type, param.initializer);
@@ -647,6 +650,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       result = new TypeCheck(operand, runtimeType);
       _summary.add(result);
     }
+
     return result;
   }
 

@@ -519,11 +519,10 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
   final InterfaceType dartType;
   int _hashCode;
 
-  // May be null if there are no type arguments constraints. Individual
-  // components may also be null if there is no constraint on the corresponding
-  // type parameter. The type arguments should represent type sets, i.e.
-  // `AnyType` or `SingleType`. The type arguments vector is flattened against
-  // the class hierarchy.
+  // May be null if there are no type arguments constraints. The type arguments
+  // should represent type sets, i.e. `AnyType` or `SingleType`. The type
+  // arguments vector is flattened against the class hierarchy, so if "C<T>
+  // extends B<int, T>", then the vector for "C" will have three elements.
   final List<Type> typeArgs;
 
   ConcreteType(this.classId, this.dartType, this.typeArgs) {
@@ -536,9 +535,7 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
 
   ConcreteType get raw => new ConcreteType(classId, dartType, null);
 
-  Type typeArgAt(int i) {
-    return typeArgs == null ? const AnyType() : typeArgs[i];
-  }
+  Type typeArgAt(int i) => typeArgs == null ? const AnyType() : typeArgs[i];
 
   @override
   Class getConcreteClass(TypeHierarchy typeHierarchy) => dartType.classNode;
@@ -548,7 +545,9 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
     if (typeArgs == null) {
       return typeHierarchy.isSubtype(this.dartType, dartType);
     } else {
-      // TODO(sjindel): Take type arguments into account.
+      // TODO(sjindel/tfa): Take type arguments into account. Currently we only
+      // use this method for checking if a type is a subtype of int.
+      assertx(dartType.toString() == "dart.core::int", details: "$dartType");
       return false;
     }
   }
@@ -591,13 +590,9 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
   int compareTo(ConcreteType other) => classId.compareTo(other.classId);
 
   @override
-  String toString() {
-    if (typeArgs == null) {
-      return "_T (${dartType})";
-    } else {
-      return "_T (${dartType.classNode}<${typeArgs.join(', ')}>)";
-    }
-  }
+  String toString() => typeArgs == null
+      ? "_T (${dartType})"
+      : "_T (${dartType.classNode}<${typeArgs.join(', ')}>)";
 
   @override
   int get order => TypeOrder.Concrete.index;
@@ -616,6 +611,7 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
             : <ConcreteType>[other, this];
         return new SetType(types);
       } else {
+        assertx(typeArgs != null || other.typeArgs != null);
         return raw;
       }
     } else {
@@ -681,7 +677,7 @@ class SingleType extends Type {
   operator ==(other) => other is SingleType && other.type == type;
 
   @override
-  String toString() => "_TS (${type})";
+  String toString() => "_TS {$type}";
 
   @override
   bool get isSpecialized =>
