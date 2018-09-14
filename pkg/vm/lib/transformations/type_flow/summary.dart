@@ -337,21 +337,25 @@ class InstantiateType extends Statement {
   @override
   Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
       CallHandler callHandler) {
-    List<DartType> types;
-    for (final arg in typeArgs) {
-      final argType = arg.getComputedType(computedTypes);
+    final types = new List<DartType>(typeArgs.length);
+    for (int i = 0; i < typeArgs.length; ++i) {
+      final argType = typeArgs[i].getComputedType(computedTypes);
       if (argType is AnyType) {
         return const AnyType();
       } else if (argType is SingleType) {
-        types.add(argType.type);
+        types[i] = argType.type;
       } else {
-        assertx(argType is AnyType || argType is SingleType);
+        throw "Invalid type $argType passed to InstantiateType.apply.";
       }
     }
     return new SingleType(new InterfaceType(type.classNode, types));
   }
 }
 
+// Used to narrow a value set against a type set.
+//
+// Currently we only put these on parameters and explicit casts. We could use it
+// many more places where static types are approximated.
 class TypeCheck extends Statement {
   TypeExpr arg;
   TypeExpr type;
@@ -374,10 +378,8 @@ class TypeCheck extends Statement {
     } else if (checkType is SingleType) {
       return argType.intersection(
           Type.fromStatic(checkType.type), typeHierarchy);
-    } else {
-      assertx(false, details: "Can only TypeCheck against type set.");
-      return null;
     }
+    throw "Can only TypeCheck against type set.";
   }
 }
 

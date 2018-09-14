@@ -275,12 +275,14 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   final _FallthroughDetector _fallthroughDetector = new _FallthroughDetector();
 
   Summary _summary;
-  Map<VariableDeclaration, Join> _variables;
+  Map<VariableDeclaration, Join> _variableJoins;
+  Map<VariableDeclaration, TypeExpr> _variables;
   Join _returnValue;
   Parameter _receiver;
   ConstantAllocationCollector constantAllocationCollector;
   List<TypeExpr> _classTypeVariables;
   Member _member;
+  TypeSetTranslator _translator;
 
   SummaryCollector(this.target, this._environment, this._entryPointsListener,
       this._nativeCodeOracle) {
@@ -291,7 +293,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     debugPrint("===== ${member} =====");
     assertx(!member.isAbstract);
 
-    _variables = <VariableDeclaration, Join>{};
+    _variableJoins = <VariableDeclaration, Join>{};
+    _variables = <VariableDeclaration, TypeExpr>{};
     _returnValue = null;
     _receiver = null;
     _member = member;
@@ -316,6 +319,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       } else {
         _summary = new Summary();
       }
+      _translator = new TypeSetTranslator(
+          _member.enclosingClass, _summary, _receiver, _classTypeVariables);
       assertx(member.initializer != null);
       _summary.result = _visit(member.initializer);
     } else {
@@ -340,6 +345,9 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         _environment.thisType = member.enclosingClass?.thisType;
       }
 
+      _translator = new TypeSetTranslator(
+          _member.enclosingClass, _summary, _receiver, _classTypeVariables);
+
       for (VariableDeclaration param in function.positionalParameters) {
         _declareParameter(param.name, param.type, param.initializer);
       }
@@ -349,11 +357,11 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
       int count = firstParamIndex;
       for (VariableDeclaration param in function.positionalParameters) {
-        Join v = _declareVariable(param);
+        Join v = _declareVariable(param, narrowRuntimeType: true);
         v.values.add(_summary.statements[count++]);
       }
       for (VariableDeclaration param in function.namedParameters) {
-        Join v = _declareVariable(param);
+        Join v = _declareVariable(param, narrowRuntimeType: true);
         v.values.add(_summary.statements[count++]);
       }
       assertx(count == _summary.parameterCount);
@@ -507,17 +515,31 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     return param;
   }
 
-  Join _declareVariable(VariableDeclaration decl, {bool addInitType: false}) {
-    Join v = new Join(decl.name, decl.type);
-    _summary.add(v);
-    _variables[decl] = v;
+  Join _declareVariable(VariableDeclaration decl,
+      {bool addInitType: false, bool narrowRuntimeType: false}) {
+    Join join = new Join(decl.name, decl.type);
+    _summary.add(join);
+    _variableJoins[decl] = join;
+
+    TypeExpr variable = join;
+    if (narrowRuntimeType) {
+      TypeExpr runtimeType = _translator.translate(decl.type);
+      if (runtimeType is Statement) {
+        variable = new TypeCheck(variable, runtimeType);
+        _summary.add(variable);
+      }
+    }
+
+    _variables[decl] = variable;
+
     if (decl.initializer != null) {
       TypeExpr initType = _visit(decl.initializer);
       if (addInitType) {
-        v.values.add(initType);
+        join.values.add(initType);
       }
     }
-    return v;
+
+    return join;
   }
 
   // TODO(alexmarkov): Avoid declaring variables with static types.
@@ -588,19 +610,24 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   Class get _superclass => _environment.thisType.classNode.superclass;
 
   void _handleNestedFunctionNode(FunctionNode node) {
-    var oldReturn = _returnValue;
-    var oldVariables = _variables;
+    final oldReturn = _returnValue;
+    final oldVariableJoins = _variableJoins;
+    final oldVariables = _variables;
     _returnValue = null;
-    _variables = <VariableDeclaration, Join>{};
+    _variableJoins = <VariableDeclaration, Join>{};
+    _variableJoins.addAll(oldVariableJoins);
+    _variables = <VariableDeclaration, TypeExpr>{};
     _variables.addAll(oldVariables);
 
     // Approximate parameters of nested functions with static types.
+    // TODO(sjindel/tfa): Use TypeCheck for closure parameters.
     node.positionalParameters.forEach(_declareVariableWithStaticType);
     node.namedParameters.forEach(_declareVariableWithStaticType);
 
     _visit(node.body);
 
     _returnValue = oldReturn;
+    _variableJoins = oldVariableJoins;
     _variables = oldVariables;
   }
 
@@ -612,7 +639,15 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   TypeExpr visitAsExpression(AsExpression node) {
     TypeExpr operand = _visit(node.operand);
     Type type = new Type.fromStatic(node.type);
-    return _makeNarrow(operand, type);
+
+    var result = _makeNarrow(operand, type);
+
+    TypeExpr runtimeType = _translator.translate(node.type);
+    if (runtimeType is Statement) {
+      result = new TypeCheck(operand, runtimeType);
+      _summary.add(result);
+    }
+    return result;
   }
 
   @override
@@ -644,8 +679,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   TypeExpr _instantiateConcreteClass(
       ConcreteType type, List<DartType> typeArguments) {
     if (typeArguments.length == 0) return type;
-    final translator = new TypeSetTranslator(
-        _member.enclosingClass, _summary, _receiver, _classTypeVariables);
     List<DartType> flattenedTypes = flattenInstantiatorTypeArguments(
         type.getConcreteClass(null), typeArguments);
     int flattenedLength = flattenedTypes.length;
@@ -653,7 +686,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     List<TypeExpr> typeExprs = new List(flattenedLength);
     bool allAnyType = true;
     for (int i = 0; i < flattenedLength; ++i) {
-      TypeExpr arg = translator.process(flattenedTypes[i]);
+      TypeExpr arg = _translator.translate(flattenedTypes[i]);
       typeExprs[i] = arg;
       if (types != null && arg is Type) {
         types[i] = arg;
@@ -1022,7 +1055,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   @override
   TypeExpr visitVariableGet(VariableGet node) {
-    Join v = _variables[node.variable];
+    final v = _variables[node.variable];
     if (v == null) {
       throw 'Unable to find variable ${node.variable}';
     }
@@ -1037,7 +1070,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   @override
   TypeExpr visitVariableSet(VariableSet node) {
-    Join v = _variables[node.variable];
+    Join v = _variableJoins[node.variable];
     assertx(v != null, details: node);
 
     TypeExpr value = _visit(node.value);
@@ -1289,11 +1322,18 @@ class TypeSetTranslator extends DartTypeVisitor {
 
   // Creates a TypeExpr representing the set of types which can flow through a
   // given DartType.
-  TypeExpr process(DartType type) {
+  //
+  // Will return AnyType, SingleType or Statement.
+  TypeExpr translate(DartType type) {
     final result = _visit(type);
-    return result == null
-        ? AnyType()
-        : result is DartType ? new SingleType(result) : result;
+    if (result == null) {
+      return AnyType();
+    } else if (result is DartType) {
+      return new SingleType(result);
+    } else {
+      assertx(result is Statement);
+      return result;
+    }
   }
 
   _visit(DartType type) => type.accept(this);
@@ -1312,7 +1352,7 @@ class TypeSetTranslator extends DartTypeVisitor {
     final args = type.typeArguments.map(_visit);
     if (args.any((t) => t == null)) return null;
     if (args.any((t) => t is TypeExpr)) {
-      final result = InstantiateType(
+      final result = new InstantiateType(
           new InterfaceType(type.classNode),
           args
               .map((t) => t is DartType ? new SingleType(t) : t as TypeExpr)

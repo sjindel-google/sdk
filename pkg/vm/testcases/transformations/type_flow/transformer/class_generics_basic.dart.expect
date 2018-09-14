@@ -8,6 +8,10 @@ class C<T extends core::Object = dynamic> extends core::Object {
     ;
   method foo() → dynamic
     return new self::D::•<self::C::T>();
+  method id([@vm.inferred-type.metadata=#lib::Z] dynamic x) → dynamic
+    return x as self::C::T;
+  method id2([@vm.inferred-type.metadata=#lib::Z] generic-covariant-impl self::C::T x) → dynamic
+    return x;
 }
 class D<T extends core::Object = dynamic> extends core::Object {
   synthetic constructor •() → void
@@ -25,11 +29,26 @@ class E<S extends core::Object = dynamic, T extends core::Object = dynamic> exte
   method baz() → dynamic
     return new self::D::•<self::E::T>();
 }
+abstract class X extends core::Object {
+  synthetic constructor •() → void
+    : super core::Object::•()
+    ;
+}
+abstract class Y extends self::X {
+}
+class Z extends self::X {
+  synthetic constructor •() → void
+    : super self::X::•()
+    ;
+}
 static method main() → dynamic {
   dynamic used;
   used = [@vm.direct-call.metadata=#lib::C::foo] [@vm.inferred-type.metadata=#lib::D<dart.core::int>] new self::C::•<core::int>().{self::C::foo}();
   used = [@vm.direct-call.metadata=#lib::E::foo] [@vm.inferred-type.metadata=#lib::D<dart.core::String>] new self::E::•<core::int, core::String>().{self::E::foo}();
   used = [@vm.direct-call.metadata=#lib::E::bar] [@vm.inferred-type.metadata=#lib::D<dart.core::int>] new self::E::•<core::int, core::String>().{self::E::bar}();
   used = [@vm.direct-call.metadata=#lib::E::baz] [@vm.inferred-type.metadata=#lib::D<dart.core::String>] new self::E::•<core::int, core::String>().{self::E::baz}();
+  self::C<self::X> c = new self::C::•<self::Y>();
+  let dynamic #t1 = [@vm.direct-call.metadata=#lib::C::id] [@vm.inferred-type.metadata=!] c.{self::C::id}(new self::Z::•()) in throw "Attempt to execute code removed by Dart AOT compiler (TFA)";
+  let dynamic #t2 = [@vm.call-site-attributes.metadata=receiverType:#lib::C<#lib::X>] [@vm.direct-call.metadata=#lib::C::id2] [@vm.inferred-type.metadata=!] c.{self::C::id2}(new self::Z::•()) in throw "Attempt to execute code removed by Dart AOT compiler (TFA)";
   return used;
 }
