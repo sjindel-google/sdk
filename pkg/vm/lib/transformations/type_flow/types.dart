@@ -663,6 +663,8 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
   }
 }
 
+// Unlike the other 'Type's, this represents a set of types, not a set of
+// values. It represents the singleton set containing 'type'.
 class SingleType extends Type {
   final DartType type;
 
