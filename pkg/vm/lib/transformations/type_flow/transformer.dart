@@ -152,7 +152,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
       typeArgs = type.typeArgs
           .getRange(type.typeArgs.length - concreteClass.typeParameters.length,
               type.typeArgs.length)
-          .map((t) => t is AnyType ? null : (t as SingleType).type)
+          .map((t) => t is AnyType ? null : (t as PureType).type)
           .toList();
     }
 

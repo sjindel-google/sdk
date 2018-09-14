@@ -312,16 +312,16 @@ class Instantiate extends Statement {
   @override
   Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
       CallHandler callHandler) {
-    bool hasSingleType = false;
+    bool hasPureType = false;
     final types = new List<Type>(typeArgs.length);
     for (int i = 0; i < types.length; ++i) {
       final computed = typeArgs[i].getComputedType(computedTypes);
-      assertx(computed is SingleType || computed is AnyType);
-      if (computed is SingleType) hasSingleType = true;
+      assertx(computed is PureType || computed is AnyType);
+      if (computed is PureType) hasPureType = true;
       types[i] = computed;
     }
     return new ConcreteType(
-        type.classId, type.dartType, hasSingleType ? types : null);
+        type.classId, type.dartType, hasPureType ? types : null);
   }
 }
 
@@ -349,13 +349,13 @@ class InstantiateType extends Statement {
       final argType = typeArgs[i].getComputedType(computedTypes);
       if (argType is AnyType) {
         return const AnyType();
-      } else if (argType is SingleType) {
+      } else if (argType is PureType) {
         types[i] = argType.type;
       } else {
         throw "Invalid type $argType passed to InstantiateType.apply.";
       }
     }
-    return new SingleType(new InterfaceType(type.classNode, types));
+    return new PureType(new InterfaceType(type.classNode, types));
   }
 }
 
@@ -382,7 +382,7 @@ class TypeCheck extends Statement {
     Type checkType = type.getComputedType(computedTypes);
     if (checkType is AnyType) {
       return argType;
-    } else if (checkType is SingleType) {
+    } else if (checkType is PureType) {
       return argType.intersection(
           Type.fromStatic(checkType.type), typeHierarchy);
     }

@@ -118,7 +118,7 @@ abstract class Type extends TypeExpr {
 
 /// Order of precedence between types for evaluation of union/intersection.
 enum TypeOrder {
-  SingleType,
+  PureType,
   Empty,
   Nullable,
   Any,
@@ -526,7 +526,7 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
   int _hashCode;
 
   // May be null if there are no type arguments constraints. The type arguments
-  // should represent type sets, i.e. `AnyType` or `SingleType`. The type
+  // should represent type sets, i.e. `AnyType` or `PureType`. The type
   // arguments vector is flattened against the class hierarchy, so if "C<T>
   // extends B<int, T>", then the vector for "C" will have three elements.
   final List<Type> typeArgs;
@@ -645,18 +645,18 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
       }
 
       final mergedTypeArgs = new List<Type>(typeArgs.length);
-      bool hasSingleType = false;
+      bool hasPureType = false;
       for (int i = 0; i < typeArgs.length; ++i) {
         final merged =
             typeArgs[i].intersection(other.typeArgs[i], typeHierarchy);
         if (merged is EmptyType) {
           return EmptyType();
-        } else if (merged is SingleType) {
-          hasSingleType = true;
+        } else if (merged is PureType) {
+          hasPureType = true;
         }
         mergedTypeArgs[i] = merged;
       }
-      return hasSingleType
+      return hasPureType
           ? new ConcreteType(classId, dartType, mergedTypeArgs)
           : raw;
     } else {
@@ -667,47 +667,47 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
 
 // Unlike the other 'Type's, this represents a set of types, not a set of
 // values. It represents the singleton set containing 'type'.
-class SingleType extends Type {
+class PureType extends Type {
   final DartType type;
 
-  const SingleType(this.type);
+  const PureType(this.type);
 
-  int get order => TypeOrder.SingleType.index;
+  int get order => TypeOrder.PureType.index;
 
   @override
   int get hashCode => type.hashCode;
 
   @override
-  operator ==(other) => other is SingleType && other.type == type;
+  operator ==(other) => other is PureType && other.type == type;
 
   @override
   String toString() => "_TS {$type}";
 
   @override
   bool get isSpecialized =>
-      throw "ERROR: SingleType does not support isSpecialized.";
+      throw "ERROR: PureType does not support isSpecialized.";
 
   @override
   bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) =>
-      throw "ERROR: SingleType does not support isSubtypeOf.";
+      throw "ERROR: PureType does not support isSubtypeOf.";
 
   @override
   Type union(Type other, TypeHierarchy typeHierarchy) =>
-      throw "ERROR: SingleType does not support union.";
+      throw "ERROR: PureType does not support union.";
 
   @override
   Type intersection(Type other, TypeHierarchy typeHierarchy) {
     if (other is AnyType) {
       return this;
-    } else if (other is SingleType) {
+    } else if (other is PureType) {
       return this == other ? this : const EmptyType();
     }
-    throw "ERROR: SingleType cannot intersect with ${other.runtimeType}";
+    throw "ERROR: PureType cannot intersect with ${other.runtimeType}";
   }
 
   @override
   Type specialize(TypeHierarchy typeHierarchy) =>
-      throw "ERROR: SingleType does not support specialize.";
+      throw "ERROR: PureType does not support specialize.";
 
   @override
   Class getConcreteClass(TypeHierarchy typeHierarchy) =>

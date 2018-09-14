@@ -1327,13 +1327,13 @@ class TypeSetTranslator extends DartTypeVisitor {
   // Creates a TypeExpr representing the set of types which can flow through a
   // given DartType.
   //
-  // Will return AnyType, SingleType or Statement.
+  // Will return AnyType, PureType or Statement.
   TypeExpr translate(DartType type) {
     final result = _visit(type);
     if (result == null) {
       return AnyType();
     } else if (result is DartType) {
-      return new SingleType(result);
+      return new PureType(result);
     } else {
       assertx(result is Statement);
       return result;
@@ -1359,7 +1359,7 @@ class TypeSetTranslator extends DartTypeVisitor {
       final result = new InstantiateType(
           new InterfaceType(type.classNode),
           args
-              .map((t) => t is DartType ? new SingleType(t) : t as TypeExpr)
+              .map((t) => t is DartType ? new PureType(t) : t as TypeExpr)
               .toList());
       summary.add(result);
       return result;
