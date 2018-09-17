@@ -701,6 +701,8 @@ class _FieldValue extends _DependencyTracker {
     }
   }
 
+  bool get needsCheck => (setterSummary?.result as TypeCheck)?.checkNeeded;
+
   bool _isDefaultValueOfFieldObservable() {
     if (field.isStatic) {
       return true;
@@ -1249,7 +1251,12 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
 
   Type fieldType(Field field) => _fieldValues[field]?.value;
 
+  bool fieldSkipCheck(Field field) => _fieldValues[field]?.needsCheck == false;
+
   Args<Type> argumentTypes(Member member) => _summaries[member]?.argumentTypes;
+
+  List<VariableDeclaration> skipCheckParams(Member member) =>
+      _summaries[member]?.skipCheckParams;
 
   /// ---- Implementation of [CallHandler] interface. ----
 

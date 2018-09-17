@@ -363,11 +363,18 @@ class InstantiateType extends Statement {
 //
 // Currently we only put these on parameters and explicit casts. We could use it
 // many more places where static types are approximated.
+//
+// TODO(sjindel/tfa): Use TypeCheck when setting a field directly to skip checks
+// on implicit setters.
 class TypeCheck extends Statement {
   TypeExpr arg;
   TypeExpr type;
 
-  TypeCheck(this.arg, this.type);
+  final VariableDeclaration parameter; // may be null
+
+  bool checkNeeded = false;
+
+  TypeCheck(this.arg, this.type, this.parameter);
 
   @override
   void accept(StatementVisitor visitor) => visitor.visitTypeCheck(this);
@@ -381,10 +388,22 @@ class TypeCheck extends Statement {
     Type argType = arg.getComputedType(computedTypes);
     Type checkType = type.getComputedType(computedTypes);
     if (checkType is AnyType) {
+      if (argType is EmptyType ||
+          (argType is NullableType && argType.baseType is EmptyType)) {
+        return argType;
+      }
+      checkNeeded = true;
       return argType;
     } else if (checkType is PureType) {
-      return argType.intersection(
-          Type.fromStatic(checkType.type), typeHierarchy);
+      Type result =
+          argType.intersection(Type.fromStatic(checkType.type), typeHierarchy);
+      if (!checkNeeded && result != argType) {
+        checkNeeded = true;
+        if (kPrintTrace) {
+          tracePrint("checkNeeded = true: $argType vs. $checkType");
+        }
+      }
+      return result;
     }
     throw "Can only TypeCheck against type set.";
   }
@@ -508,5 +527,18 @@ class Summary {
       }
     }
     return new Args<Type>(argTypes, names: argNames);
+  }
+
+  List<VariableDeclaration> get skipCheckParams {
+    final vars = <VariableDeclaration>[];
+    for (final statement in _statements) {
+      if (statement is TypeCheck && !statement.checkNeeded) {
+        final decl = statement.parameter;
+        if (decl != null && decl.isGenericCovariantImpl) {
+          vars.add(decl);
+        }
+      }
+    }
+    return vars;
   }
 }

@@ -299,12 +299,17 @@ ScopeBuildingResult* ScopeBuilder::BuildScopes() {
 
         if (is_method &&
             MethodCanSkipTypeChecksForNonCovariantArguments(function, attrs)) {
+          const InferredTypeMetadata parameter_type =
+              inferred_type_metadata_helper_.GetInferredType(
+                  helper_.ReaderOffset());
+
           FieldHelper field_helper(&helper_);
           field_helper.ReadUntilIncluding(FieldHelper::kFlags);
 
-          if (!field_helper.IsCovariant() &&
-              (!field_helper.IsGenericCovariantImpl() ||
-               (!attrs.has_non_this_uses && !attrs.has_tearoff_uses))) {
+          if ((parameter_type.SkipCheck() && FLAG_use_tfa_check_bits) ||
+              (!field_helper.IsCovariant() &&
+               (!field_helper.IsGenericCovariantImpl() ||
+                (!attrs.has_non_this_uses && !attrs.has_tearoff_uses)))) {
             result_->setter_value->set_type_check_mode(
                 LocalVariable::kTypeCheckedByCaller);
           }
@@ -1465,6 +1470,11 @@ void ScopeBuilder::AddVariableDeclarationParameter(
       variable->set_type_check_mode(LocalVariable::kTypeCheckedByCaller);
       break;
   }
+
+  if (parameter_type.SkipCheck() && FLAG_use_tfa_check_bits) {
+    variable->set_type_check_mode(LocalVariable::kTypeCheckedByCaller);
+  }
+
   scope_->InsertParameterAt(pos, variable);
   result_->locals.Insert(helper_.data_program_offset_ + kernel_offset,
                          variable);

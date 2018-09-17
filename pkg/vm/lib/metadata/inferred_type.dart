@@ -9,10 +9,11 @@ import 'package:kernel/ast.dart';
 /// Metadata for annotating nodes with an inferred type information.
 class InferredType {
   final Reference _concreteClassReference;
-  final int _flags;
+  int _flags;
 
   static const int flagNullable = 1 << 0;
   static const int flagInt = 1 << 1;
+  static const int flagSkipCheck = 1 << 2;
 
   // Entire list may be null if no type arguments were inferred.
   // Will always be null if `concreteClass` is null.
@@ -25,10 +26,12 @@ class InferredType {
   final List<DartType> exactTypeArguments;
 
   InferredType(Class concreteClass, bool nullable, bool isInt,
-      {List<DartType> exactTypeArguments})
+      {List<DartType> exactTypeArguments, bool skipCheck: false})
       : this._byReference(
             getClassReference(concreteClass),
-            (nullable ? flagNullable : 0) | (isInt ? flagInt : 0),
+            (nullable ? flagNullable : 0) |
+                (isInt ? flagInt : 0) |
+                (skipCheck ? flagSkipCheck : 0),
             exactTypeArguments);
 
   InferredType._byReference(
@@ -40,6 +43,9 @@ class InferredType {
 
   bool get nullable => (_flags & flagNullable) != 0;
   bool get isInt => (_flags & flagInt) != 0;
+  bool get skipCheck => (_flags & flagSkipCheck) != 0;
+
+  set skipCheck(bool value) => _flags |= (value ? flagSkipCheck : 0);
 
   @override
   String toString() {
@@ -52,7 +58,8 @@ class InferredType {
           exactTypeArguments.map((t) => t != null ? "$t" : "?").join(", ");
       typeArgs = "<" + typeArgs + ">";
     }
-    return base + suffix + typeArgs;
+    final skip = skipCheck ? " (skip check)" : "";
+    return base + suffix + typeArgs + skip;
   }
 }
 

@@ -338,7 +338,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       } else {
         Parameter valueParam = _declareParameter("value", member.type, null);
         TypeExpr runtimeType = _translator.translate(member.type);
-        final check = new TypeCheck(valueParam, runtimeType);
+        final check = new TypeCheck(valueParam, runtimeType, null);
         _summary.add(check);
         _summary.result = check;
       }
@@ -544,7 +544,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     if (narrowRuntimeType) {
       TypeExpr runtimeType = _translator.translate(decl.type);
       if (runtimeType is Statement) {
-        variable = new TypeCheck(variable, runtimeType);
+        variable = new TypeCheck(variable, runtimeType, decl);
         _summary.add(variable);
         _summary.add(new Use(variable));
       }
@@ -664,7 +664,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
     TypeExpr runtimeType = _translator.translate(node.type);
     if (runtimeType is Statement) {
-      result = new TypeCheck(operand, runtimeType);
+      result = new TypeCheck(operand, runtimeType, /*parameter=*/ null);
       _summary.add(result);
     }
 
