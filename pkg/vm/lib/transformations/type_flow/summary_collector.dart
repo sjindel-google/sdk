@@ -269,6 +269,8 @@ class _FallthroughDetector extends ast.StatementVisitor<bool> {
   bool visitFunctionDeclaration(FunctionDeclaration node) => true;
 }
 
+enum FieldSummaryType { kSetter, kInitializer }
+
 /// Create a type flow summary for a member from the kernel AST.
 class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   final Target target;
@@ -293,7 +295,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     constantAllocationCollector = new ConstantAllocationCollector(this);
   }
 
-  Summary createSummary(Member member) {
+  Summary createSummary(Member member,
+      {fieldSummaryType: FieldSummaryType.kInitializer}) {
     debugPrint("===== ${member} =====");
     assertx(!member.isAbstract);
 
@@ -312,8 +315,11 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     }
 
     if (member is Field) {
+      int numArgs = fieldSummaryType == FieldSummaryType.kInitializer ? 1 : 2;
+
       if (hasReceiver) {
-        _summary = new Summary(parameterCount: 1, positionalParameterCount: 1);
+        _summary = new Summary(
+            parameterCount: numArgs, positionalParameterCount: numArgs);
         // TODO(alexmarkov): subclass cone
         _receiver = _declareParameter(
             "this", member.enclosingClass.rawType, null,
@@ -322,10 +328,20 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       } else {
         _summary = new Summary();
       }
+
       _translator = new TypeSetTranslator(
           member.enclosingClass, _summary, _receiver, _classTypeVariables);
-      assertx(member.initializer != null);
-      _summary.result = _visit(member.initializer);
+
+      if (fieldSummaryType == FieldSummaryType.kInitializer) {
+        assertx(member.initializer != null);
+        _summary.result = _visit(member.initializer);
+      } else {
+        Parameter valueParam = _declareParameter("value", member.type, null);
+        TypeExpr runtimeType = _translator.translate(member.type);
+        final check = new TypeCheck(valueParam, runtimeType);
+        _summary.add(check);
+        _summary.result = check;
+      }
     } else {
       FunctionNode function = member.function;
 
@@ -530,6 +546,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       if (runtimeType is Statement) {
         variable = new TypeCheck(variable, runtimeType);
         _summary.add(variable);
+        _summary.add(new Use(variable));
       }
     }
 

@@ -171,7 +171,8 @@ class _DirectInvocation extends _Invocation {
         assertx(args.values.length == firstParamIndex + 1);
         assertx(args.names.isEmpty);
         final Type setterArg = args.values[firstParamIndex];
-        fieldValue.setValue(setterArg, typeFlowAnalysis);
+        fieldValue.setValue(setterArg, typeFlowAnalysis,
+            firstParamIndex == 1 ? args.values[0] : null);
         return const EmptyType();
 
       case CallKind.Method:
@@ -202,7 +203,8 @@ class _DirectInvocation extends _Invocation {
           // does not throw exception.
           initializerResult = new Type.nullable(initializerResult);
         }
-        fieldValue.setValue(initializerResult, typeFlowAnalysis);
+        fieldValue.setValue(initializerResult, typeFlowAnalysis,
+            firstParamIndex == 1 ? args.values[0] : null);
         return const EmptyType();
     }
 
@@ -687,9 +689,11 @@ class _InvocationsCache {
 class _FieldValue extends _DependencyTracker {
   final Field field;
   final Type staticType;
+  final Summary setterSummary;
   Type value;
 
-  _FieldValue(this.field) : staticType = new Type.fromStatic(field.type) {
+  _FieldValue(this.field, this.setterSummary)
+      : staticType = new Type.fromStatic(field.type) {
     if (field.initializer == null && _isDefaultValueOfFieldObservable()) {
       value = new Type.nullable(const EmptyType());
     } else {
@@ -739,7 +743,8 @@ class _FieldValue extends _DependencyTracker {
     return value;
   }
 
-  void setValue(Type newValue, TypeFlowAnalysis typeFlowAnalysis) {
+  void setValue(
+      Type newValue, TypeFlowAnalysis typeFlowAnalysis, Type receiverType) {
     // Make sure type cones are specialized before putting them into field
     // value, in order to ensure that dependency is established between
     // cone's base type and corresponding field setter.
@@ -765,11 +770,12 @@ class _FieldValue extends _DependencyTracker {
     // is established.
     //
     final hierarchy = typeFlowAnalysis.hierarchyCache;
-    Type newType = value
-        .union(
-            newValue.specialize(hierarchy).intersection(staticType, hierarchy),
-            hierarchy)
-        .specialize(hierarchy);
+    final narrowedNewValue = setterSummary != null
+        ? setterSummary.apply(
+            new Args([receiverType, newValue]), hierarchy, typeFlowAnalysis)
+        : newValue.specialize(hierarchy).intersection(staticType, hierarchy);
+    Type newType =
+        value.union(narrowedNewValue, hierarchy).specialize(hierarchy);
     assertx(newType.isSpecialized);
 
     if (newType != value) {
@@ -1216,7 +1222,12 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
   }
 
   _FieldValue getFieldValue(Field field) {
-    return _fieldValues[field] ??= new _FieldValue(field);
+    Summary setterSummary = null;
+    if (field.isGenericCovariantImpl) {
+      setterSummary = summaryCollector.createSummary(field,
+          fieldSummaryType: FieldSummaryType.kSetter);
+    }
+    return _fieldValues[field] ??= new _FieldValue(field, setterSummary);
   }
 
   void process() {
@@ -1281,7 +1292,13 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
 
   @override
   void addDirectFieldAccess(Field field, Type value) {
-    getFieldValue(field).setValue(value, this);
+    final fieldValue = getFieldValue(field);
+    if (field.isStatic) {
+      fieldValue.setValue(value, this, /*receiver_type=*/ null);
+    } else {
+      final receiver = new Type.cone(new InterfaceType(field.parent));
+      fieldValue.setValue(value, this, receiver);
+    }
   }
 
   @override
