@@ -311,7 +311,7 @@ cc/RegExp_TwoByteString: Skip # TODO(vegorov) These tests don't seem to work if 
 cc/RegenerateAllocStubs: Skip # This test is meaningless for DBC as allocation stubs are not used.
 
 [ $arch == simdbc || $arch == simdbc64 || $arch == dartkb ]
-dart/generic_field_invocation_test: Skip
+dart/generic_field_invocation_test: SkipByDesign # DBC and KBC interpreters do not support --no_lazy_dispatchers
 
 [ $compiler == dart2analyzer || $compiler == dart2js ]
 dart/data_uri*test: Skip # Data uri's not supported by dart2js or the analyzer.
