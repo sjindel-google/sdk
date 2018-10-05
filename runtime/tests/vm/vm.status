@@ -401,3 +401,7 @@ dart/stack_overflow_shared_test: SkipSlow # Too slow with --slow-path-triggers-g
 
 [ ($runtime == vm || $runtime == dart_precompiled) && !$preview_dart_2 ]
 *:SkipByDesign # Deprecating all Dart1 modes of execution
+
+[ $arch == ia32 && $mode == debug ]
+service/pause_on_unhandled_async_exceptions2_test: Slow
+service/coverage_optimized_function_test: Slow
