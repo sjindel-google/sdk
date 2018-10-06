@@ -17,14 +17,14 @@ class _NotRealHashMap<K extends core::Object = dynamic, V extends core::Object =
   synthetic constructor •() → self::_NotRealHashMap<self::_NotRealHashMap::K, self::_NotRealHashMap::V>
     : super core::Object::•()
     ;
-[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method setEntry([@vm.inferred-type.metadata=! (skip check)] generic-covariant-impl self::_NotRealHashMap::K key, [@vm.inferred-type.metadata=dart.core::_Smi? (skip check)] generic-covariant-impl self::_NotRealHashMap::V value) → void {}
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasThisUses:false,hasTearOffUses:false]  method setEntry([@vm.inferred-type.metadata=! (skip check)] generic-covariant-impl self::_NotRealHashMap::K key, [@vm.inferred-type.metadata=dart.core::_Smi? (skip check)] generic-covariant-impl self::_NotRealHashMap::V value) → void {}
 }
 class InheritedElement extends self::Element {
-[@vm.inferred-type.metadata=#lib::_NotRealHashMap<#lib::Element, dart.core::Object>] [@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:false,hasTearOffUses:false]  final field self::MockHashMap<self::Element, core::Object> _dependents = [@vm.inferred-type.metadata=#lib::_NotRealHashMap<#lib::Element, dart.core::Object>] self::MockHashMap::•<self::Element, core::Object>();
+[@vm.inferred-type.metadata=#lib::_NotRealHashMap<#lib::Element, dart.core::Object>] [@vm.procedure-attributes.metadata=hasDynamicUses:false,hasThisUses:false,hasNonThisUses:false,hasTearOffUses:false]  final field self::MockHashMap<self::Element, core::Object> _dependents = [@vm.inferred-type.metadata=#lib::_NotRealHashMap<#lib::Element, dart.core::Object>] self::MockHashMap::•<self::Element, core::Object>();
   synthetic constructor •() → self::InheritedElement
     : super self::Element::•()
     ;
-[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:true,hasTearOffUses:false]  method setDependencies([@vm.inferred-type.metadata=!] self::Element dependent, [@vm.inferred-type.metadata=dart.core::_Smi?] core::Object value) → void {
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasThisUses:false,hasTearOffUses:false]  method setDependencies([@vm.inferred-type.metadata=!] self::Element dependent, [@vm.inferred-type.metadata=dart.core::_Smi?] core::Object value) → void {
     [@vm.call-site-attributes.metadata=receiverType:#lib::MockHashMap<#lib::Element, dart.core::Object>] [@vm.direct-call.metadata=#lib::_NotRealHashMap::setEntry] [@vm.direct-call.metadata=#lib::InheritedElement::_dependents] [@vm.inferred-type.metadata=#lib::_NotRealHashMap<#lib::Element, dart.core::Object>] this.{self::InheritedElement::_dependents}.{self::MockHashMap::setEntry}(dependent, value);
   }
 }
