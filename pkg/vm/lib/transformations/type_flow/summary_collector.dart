@@ -159,23 +159,19 @@ class _SummaryNormalizer extends StatementVisitor {
 
   @override
   void visitCreateConcreteType(CreateConcreteType expr) {
-    for (int i = 0; i < expr.factoredTypeArgs.length; ++i) {
-      for (int j = 0; j < expr.factoredTypeArgs[i].length; ++j) {
-        expr.factoredTypeArgs[i][j] =
-            _normalizeExpr(expr.factoredTypeArgs[i][j], true);
-        if (_inLoop) return;
-      }
+    for (int i = 0; i < expr.flattenedTypeArgs.length; ++i) {
+      expr.flattenedTypeArgs[i] =
+          _normalizeExpr(expr.flattenedTypeArgs[i], true);
+      if (_inLoop) return;
     }
   }
 
   @override
   void visitCreateRuntimeType(CreateRuntimeType expr) {
-    for (int i = 0; i < expr.factoredTypeArgs.length; ++i) {
-      for (int j = 0; j < expr.factoredTypeArgs[i].length; ++j) {
-        expr.factoredTypeArgs[i][j] =
-            _normalizeExpr(expr.factoredTypeArgs[i][j], true);
-        if (_inLoop) return;
-      }
+    for (int i = 0; i < expr.flattenedTypeArgs.length; ++i) {
+      expr.flattenedTypeArgs[i] =
+          _normalizeExpr(expr.flattenedTypeArgs[i], true);
+      if (_inLoop) return;
     }
   }
 
@@ -1367,35 +1363,29 @@ class _RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
 
     // This function is very similar to 'visitInterfaceType', but with
     // many small differences.
-    final klass = type.getConcreteClass(null);
+    final klass = type.classNode;
     final substitution = Substitution.fromPairs(klass.typeParameters, typeArgs);
-    final interfaceGroups =
-        genericInterfacesInfo.factoredGenericInterfacesOf(klass);
-    final groupedTypeArgs = new List<List<TypeExpr>>(interfaceGroups.length);
+    final flattenedTypeArgs =
+        genericInterfacesInfo.flattenedTypeArgumentsFor(klass);
+    final flattenedTypeExprs = new List<TypeExpr>(flattenedTypeArgs.length);
 
     bool createConcreteType = true;
     bool allAnyType = true;
-    for (var i = 0; i < interfaceGroups.length; ++i) {
-      final typeArgs =
-          new List<TypeExpr>(interfaceGroups[i].typeArguments.length);
-      for (var j = 0; j < interfaceGroups[i].typeArguments.length; ++j) {
-        final typeExpr = translate(
-            substitution.substituteType(interfaceGroups[i].typeArguments[j]));
-        if (typeExpr != const AnyType()) allAnyType = false;
-        if (typeExpr is Statement) createConcreteType = false;
-        typeArgs[j] = typeExpr;
-      }
-      groupedTypeArgs[i] = typeArgs;
+    for (int i = 0; i < flattenedTypeArgs.length; ++i) {
+      final typeExpr =
+          translate(substitution.substituteType(flattenedTypeArgs[i]));
+      if (typeExpr != const AnyType()) allAnyType = false;
+      if (typeExpr is Statement) createConcreteType = false;
+      flattenedTypeExprs[i] = typeExpr;
     }
 
     if (allAnyType) return type;
 
     if (createConcreteType) {
-      List<List<Type>> typeArgsAsTypes =
-          groupedTypeArgs.map((ta) => new List<Type>.from(ta)).toList();
-      return new ConcreteType(type.classId, type.dartType, typeArgsAsTypes);
+      return new ConcreteType(type.classId, type.classNode,
+          new List<Type>.from(flattenedTypeExprs));
     } else {
-      final instantiate = new CreateConcreteType(type, groupedTypeArgs);
+      final instantiate = new CreateConcreteType(type, flattenedTypeExprs);
       summary.add(instantiate);
       return instantiate;
     }
@@ -1442,34 +1432,28 @@ class _RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
     if (type.typeArguments.length == 0) {
       return new RuntimeType(type, null);
     }
-    final interfaceGroups =
-        genericInterfacesInfo.factoredGenericInterfacesOf(type.classNode);
+
     final substitution = Substitution.fromPairs(
         type.classNode.typeParameters, type.typeArguments);
-    final groupedTypeArgs = new List<List<TypeExpr>>(interfaceGroups.length);
+    final flattenedTypeArgs =
+        genericInterfacesInfo.flattenedTypeArgumentsFor(type.classNode);
+    final flattenedTypeExprs = new List<TypeExpr>(flattenedTypeArgs.length);
 
     bool createRuntimeType = true;
-    for (var i = 0; i < interfaceGroups.length; ++i) {
-      final typeArgs =
-          new List<TypeExpr>(interfaceGroups[i].typeArguments.length);
-      for (var j = 0; j < interfaceGroups[i].typeArguments.length; ++j) {
-        final typeExpr = translate(
-            substitution.substituteType(interfaceGroups[i].typeArguments[j]));
-        if (typeExpr == const AnyType()) return typeExpr;
-        if (typeExpr is! RuntimeType) createRuntimeType = false;
-        typeArgs[j] = typeExpr;
-      }
-      groupedTypeArgs[i] = typeArgs;
+    for (var i = 0; i < flattenedTypeArgs.length; ++i) {
+      final typeExpr =
+          translate(substitution.substituteType(flattenedTypeArgs[i]));
+      if (typeExpr == const AnyType()) return const AnyType();
+      if (typeExpr is! RuntimeType) createRuntimeType = false;
+      flattenedTypeExprs[i] = typeExpr;
     }
 
     if (createRuntimeType) {
-      List<List<RuntimeType>> typeArgsAsRuntimeTypes =
-          groupedTypeArgs.map((ta) => new List<RuntimeType>.from(ta)).toList();
-      return new RuntimeType(
-          new InterfaceType(type.classNode), typeArgsAsRuntimeTypes);
+      return new RuntimeType(new InterfaceType(type.classNode),
+          new List<RuntimeType>.from(flattenedTypeExprs));
     } else {
       final instantiate =
-          new CreateRuntimeType(type.classNode, groupedTypeArgs);
+          new CreateRuntimeType(type.classNode, flattenedTypeExprs);
       summary.add(instantiate);
       return instantiate;
     }
@@ -1505,7 +1489,7 @@ class EmptyEntryPointsListener implements EntryPointsListener {
   @override
   ConcreteType addAllocatedClass(Class c) {
     final classId = (_classIds[c] ??= new IntClassId(++_classIdCounter));
-    return new ConcreteType(classId, c.rawType, null);
+    return new ConcreteType(classId, c, null);
   }
 
   @override

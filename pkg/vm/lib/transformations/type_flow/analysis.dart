@@ -445,12 +445,7 @@ class _DispatchableInvocation extends _Invocation {
       ConcreteType receiver,
       Map<Member, _ReceiverTypeBuilder> targets,
       TypeFlowAnalysis typeFlowAnalysis) {
-    DartType receiverDartType = receiver.dartType;
-
-    assertx(receiverDartType is! FunctionType);
-    assertx(receiverDartType is InterfaceType); // TODO(alexmarkov)
-
-    Class class_ = (receiverDartType as InterfaceType).classNode;
+    Class class_ = receiver.classNode;
 
     Member target = typeFlowAnalysis.hierarchyCache.hierarchy
         .getDispatchTarget(class_, selector.name, setter: selector.isSetter);
@@ -836,7 +831,7 @@ class _ClassData extends _DependencyTracker implements ClassId<_ClassData> {
 
   ConcreteType _concreteType;
   ConcreteType get concreteType =>
-      _concreteType ??= new ConcreteType(this, class_.rawType, null);
+      _concreteType ??= new ConcreteType(this, class_, null);
 
   Type _specializedConeType;
   Type get specializedConeType =>
@@ -883,8 +878,8 @@ class _ClassData extends _DependencyTracker implements ClassId<_ClassData> {
 class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
   final ClosedWorldClassHierarchy hierarchy;
 
-  final cachedFactoredGenericInterfaces =
-      <Class, List<FactoredGenericInterfaces>>{};
+  final supertypeOffsetsCache = <SubtypePair, int>{};
+  final cachedFlattenedTypeArgs = <Class, List<DartType>>{};
 
   GenericInterfacesInfoImpl(this.hierarchy);
 
@@ -902,8 +897,8 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
   //
   // The order of the groups returned is determinsitic, based on a topological
   // sort of the classes.
-  List<FactoredGenericInterfaces> factoredGenericInterfacesOf(Class klass) {
-    final cached = cachedFactoredGenericInterfaces[klass];
+  List<DartType> flattenedTypeArgumentsFor(Class klass) {
+    final cached = cachedFlattenedTypeArgs[klass];
     if (cached != null) return cached;
 
     List<Supertype> rawGenericInterfaces = hierarchy.genericSupertypesOf(klass);
@@ -915,39 +910,47 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
     for (final iface in rawGenericInterfaces) {
       forward[iface.classNode] = iface.typeArguments;
       backward
-          .putIfAbsent(iface.typeArguments, () => new Set<Class>())
+          .putIfAbsent(iface.typeArguments, () => Set<Class>())
           .add(iface.classNode);
     }
 
     if (!forward.containsKey(klass)) {
       final selfTypeArgs =
-          klass.typeParameters.map((t) => new TypeParameterType(t)).toList();
+          klass.typeParameters.map((t) => TypeParameterType(t)).toList();
       forward[klass] = selfTypeArgs;
-      backward.putIfAbsent(selfTypeArgs, () => new Set<Class>()).add(klass);
+      backward.putIfAbsent(selfTypeArgs, () => Set<Class>()).add(klass);
     }
 
-    Iterable<Class> classOrder =
-        hierarchy.getOrderedClasses(forward.keys).toList().reversed;
-
-    final factored = <FactoredGenericInterfaces>[];
-    for (final iface in classOrder) {
-      final typeArgs = forward[iface];
+    final classOrder = forward.keys.toList()..add(klass);
+    final flattened = <DartType>[];
+    for (int i = 0; i < classOrder.length; ++i) {
+      final typeArgs = forward[classOrder[classOrder.length - i - 1]];
       final classSet = backward[typeArgs];
       if (classSet == null) continue;
 
-      factored.add(new FactoredGenericInterfaces(classSet.toList(), typeArgs));
+      for (final supertype in classSet) {
+        supertypeOffsetsCache[SubtypePair(klass, supertype)] = i;
+      }
+      flattened.addAll(typeArgs);
       backward.remove(typeArgs);
     }
 
-    return factored;
+    cachedFlattenedTypeArgs[klass] = flattened;
+    return flattened;
   }
 
-  int genericInterfaceIndexFor(Class klass, Class iface) {
-    final factoredGenericInterfaces = factoredGenericInterfacesOf(klass);
-    for (int i = 0; i < factoredGenericInterfaces.length; ++i) {
-      if (factoredGenericInterfaces[i].interfaces.contains(iface)) return i;
+  int genericInterfaceOffsetFor(Class klass, Class iface) {
+    final pair = new SubtypePair(klass, iface);
+    int offset = supertypeOffsetsCache[pair];
+
+    if (offset == null) flattenedTypeArgumentsFor(klass);
+    offset = supertypeOffsetsCache[pair];
+
+    if (offset == null) {
+      throw "Invalid call to genericInterfaceOffsetFor.";
     }
-    throw "Invalid call to genericInterfaceIndexFor.";
+
+    return offset;
   }
 }
 
@@ -1146,11 +1149,11 @@ class _ClassHierarchyCache implements TypeHierarchy {
     }
   }
 
-  List<FactoredGenericInterfaces> factoredGenericInterfacesOf(Class klass) =>
-      genericInterfacesInfo.factoredGenericInterfacesOf(klass);
+  List<DartType> flattenedTypeArgumentsFor(Class klass) =>
+      genericInterfacesInfo.flattenedTypeArgumentsFor(klass);
 
-  int genericInterfaceIndexFor(Class klass, Class iface) =>
-      genericInterfacesInfo.genericInterfaceIndexFor(klass, iface);
+  int genericInterfaceOffsetFor(Class klass, Class iface) =>
+      genericInterfacesInfo.genericInterfaceOffsetFor(klass, iface);
 
   @override
   String toString() {

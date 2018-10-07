@@ -289,10 +289,10 @@ class Extract extends Statement {
       CallHandler callHandler) {
     Type argType = arg.getComputedType(computedTypes);
     if (argType is ConcreteType) {
-      if (argType.typeArgs == null) return const AnyType();
-      int interfaceIndex = typeHierarchy.genericInterfaceIndexFor(
-          argType.dartType.classNode, referenceClass);
-      final result = argType.typeArgs[interfaceIndex][paramIndex];
+      if (argType.ct_typeArgs == null) return const AnyType();
+      final interfaceOffset = typeHierarchy.genericInterfaceOffsetFor(
+          argType.classNode, referenceClass);
+      final result = argType.ct_typeArgs[interfaceOffset + paramIndex];
       assertx(result is AnyType || result is RuntimeType);
       return result;
     }
@@ -307,35 +307,34 @@ class Extract extends Statement {
 // details see 'ClassHierarchyCache.factoredGenericInterfacesOf'.
 class CreateConcreteType extends Statement {
   final ConcreteType type;
-  final List<List<TypeExpr>> factoredTypeArgs;
+  final List<TypeExpr> flattenedTypeArgs;
 
-  CreateConcreteType(this.type, this.factoredTypeArgs);
+  CreateConcreteType(this.type, this.flattenedTypeArgs);
 
   @override
   void accept(StatementVisitor visitor) =>
       visitor.visitCreateConcreteType(this);
 
   @override
-  String dump() =>
-      "$label = _CreateConcreteType (${type.getConcreteClass(null)} @ ${factoredTypeArgs[0]})";
+  String dump() {
+    int numImmediateTypeArgs = type.classNode.typeParameters.length;
+    return "$label = _CreateConcreteType (${type.getConcreteClass(null)} @ "
+        "${flattenedTypeArgs.take(numImmediateTypeArgs)})";
+  }
 
   @override
   Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
       CallHandler callHandler) {
     bool hasRuntimeType = false;
-    final types = new List<List<Type>>(factoredTypeArgs.length);
+    final types = new List<Type>(flattenedTypeArgs.length);
     for (int i = 0; i < types.length; ++i) {
-      final itypes = new List<Type>(factoredTypeArgs[i].length);
-      for (int j = 0; j < factoredTypeArgs[i].length; ++j) {
-        final computed = factoredTypeArgs[i][j].getComputedType(computedTypes);
-        assertx(computed is RuntimeType || computed is AnyType);
-        if (computed is RuntimeType) hasRuntimeType = true;
-        itypes[j] = computed;
-      }
-      types[i] = itypes;
+      final computed = flattenedTypeArgs[i].getComputedType(computedTypes);
+      assertx(computed is RuntimeType || computed is AnyType);
+      if (computed is RuntimeType) hasRuntimeType = true;
+      types[i] = computed;
     }
     return new ConcreteType(
-        type.classId, type.dartType, hasRuntimeType ? types : null);
+        type.classId, type.classNode, hasRuntimeType ? types : null);
   }
 }
 
@@ -344,30 +343,26 @@ class CreateConcreteType extends Statement {
 // missing ("AnyType").
 class CreateRuntimeType extends Statement {
   final Class klass;
-  final List<List<TypeExpr>> factoredTypeArgs;
+  final List<TypeExpr> flattenedTypeArgs;
 
-  CreateRuntimeType(this.klass, this.factoredTypeArgs);
+  CreateRuntimeType(this.klass, this.flattenedTypeArgs);
 
   @override
   void accept(StatementVisitor visitor) => visitor.visitCreateRuntimeType(this);
 
   @override
-  String dump() =>
-      "$label = _CreateRuntimeType ($klass @ ${factoredTypeArgs[0]})";
+  String dump() => "$label = _CreateRuntimeType ($klass @ "
+      "${flattenedTypeArgs.take(klass.typeParameters.length)})";
 
   @override
   Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
       CallHandler callHandler) {
-    final types = new List<List<RuntimeType>>(factoredTypeArgs.length);
+    final types = new List<RuntimeType>(flattenedTypeArgs.length);
     for (int i = 0; i < types.length; ++i) {
-      final itypes = new List<RuntimeType>(factoredTypeArgs[i].length);
-      for (int j = 0; j < factoredTypeArgs[i].length; ++j) {
-        final computed = factoredTypeArgs[i][j].getComputedType(computedTypes);
-        assertx(computed is RuntimeType || computed is AnyType);
-        if (computed is AnyType) return const AnyType();
-        itypes[j] = computed;
-      }
-      types[i] = itypes;
+      final computed = flattenedTypeArgs[i].getComputedType(computedTypes);
+      assertx(computed is RuntimeType || computed is AnyType);
+      if (computed is AnyType) return const AnyType();
+      types[i] = computed;
     }
     return new RuntimeType(new InterfaceType(klass), types);
   }

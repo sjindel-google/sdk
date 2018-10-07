@@ -5,7 +5,7 @@ RESULT: _T {}?
 ------------ #lib::C::foo ------------
 %this = _Parameter #0 [_T (#lib::C<dynamic>)+]
 t1 = _Extract (%this[#lib::C/0])
-t2 = _CreateConcreteType (#lib::D @ [t1])
+t2 = _CreateConcreteType (#lib::D @ (t1))
 t3 = _Call direct [#lib::D::] (t2)
 RESULT: t2
 ------------ #lib::C::id1 ------------
@@ -35,13 +35,13 @@ RESULT: t1
 ------------ #lib::E::bar ------------
 %this = _Parameter #0 [_T (#lib::E<dynamic, dynamic>)+]
 t1 = _Extract (%this[#lib::E/0])
-t2 = _CreateConcreteType (#lib::D @ [t1])
+t2 = _CreateConcreteType (#lib::D @ (t1))
 t3 = _Call direct [#lib::D::] (t2)
 RESULT: t2
 ------------ #lib::E::baz ------------
 %this = _Parameter #0 [_T (#lib::E<dynamic, dynamic>)+]
 t1 = _Extract (%this[#lib::E/1])
-t2 = _CreateConcreteType (#lib::D @ [t1])
+t2 = _CreateConcreteType (#lib::D @ (t1))
 t3 = _Call direct [#lib::D::] (t2)
 RESULT: t2
 ------------ #lib::X:: ------------

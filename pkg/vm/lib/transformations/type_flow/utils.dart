@@ -8,6 +8,7 @@ library vm.transformations.type_flow.utils;
 
 import 'package:kernel/ast.dart'
     show
+        Class,
         Constructor,
         DartType,
         Procedure,
@@ -173,4 +174,22 @@ bool typeArgumentsEquals(List<DartType> x, List<DartType> y) {
     if (x[i] != y[i]) return false;
   }
   return true;
+}
+
+class SubtypePair {
+  final Class subtype;
+  final Class supertype;
+
+  SubtypePair(this.subtype, this.supertype);
+
+  int get hashCode {
+    return subtype.hashCode ^ supertype.hashCode;
+  }
+
+  bool operator ==(Object other) {
+    if (other is SubtypePair) {
+      return subtype == other.subtype && supertype == other.supertype;
+    }
+    return false;
+  }
 }

@@ -5,7 +5,7 @@ RESULT: _T {}?
 ------------ #lib::MockHashMap:: ------------
 %K = _Parameter #0 [null]
 %V = _Parameter #1 [null]
-t2 = _CreateConcreteType (#lib::_NotRealHashMap @ [%K, %V])
+t2 = _CreateConcreteType (#lib::_NotRealHashMap @ (%K, %V))
 t3 = _Call direct [#lib::_NotRealHashMap::] (t2)
 RESULT: t2
 ------------ #lib::_NotRealHashMap:: ------------
