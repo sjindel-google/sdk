@@ -883,20 +883,6 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
 
   GenericInterfacesInfoImpl(this.hierarchy);
 
-  // Returns a list of all the generic interfaces of 'klass', grouped by
-  // distinct type-args vectors.
-  //
-  // For example:
-  //
-  // class C<T> extends A<T> implements B<int, T> {}
-  //
-  // Will have the groups:
-  //
-  // {C, A}: <T>
-  // {B}: <int, T>
-  //
-  // The order of the groups returned is determinsitic, based on a topological
-  // sort of the classes.
   List<DartType> flattenedTypeArgumentsFor(Class klass) {
     final cached = cachedFlattenedTypeArgs[klass];
     if (cached != null) return cached;
@@ -905,7 +891,7 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
 
     final forward = <Class, List<DartType>>{};
     final backward = new HashMap<List<DartType>, Set<Class>>(
-        equals: typeArgumentsEquals, hashCode: typeArgumentsHash);
+        equals: listEquals, hashCode: typeArgumentsHash);
 
     for (final iface in rawGenericInterfaces) {
       forward[iface.classNode] = iface.typeArguments;
@@ -923,14 +909,17 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
 
     final classOrder = forward.keys.toList()..add(klass);
     final flattened = <DartType>[];
+    int offset = 0;
     for (int i = 0; i < classOrder.length; ++i) {
       final typeArgs = forward[classOrder[classOrder.length - i - 1]];
       final classSet = backward[typeArgs];
       if (classSet == null) continue;
 
       for (final supertype in classSet) {
-        supertypeOffsetsCache[SubtypePair(klass, supertype)] = i;
+        supertypeOffsetsCache[SubtypePair(klass, supertype)] = offset;
       }
+      offset += typeArgs.length;
+
       flattened.addAll(typeArgs);
       backward.remove(typeArgs);
     }
@@ -1337,7 +1326,7 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
     Summary setterSummary = null;
     if (field.isGenericCovariantImpl) {
       setterSummary = summaryCollector.createSummary(field,
-          fieldSummaryType: FieldSummaryType.kSetter);
+          fieldSummaryType: FieldSummaryType.kFieldGuard);
     }
     return _fieldValues[field] ??= new _FieldValue(field, setterSummary);
   }

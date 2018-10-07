@@ -58,6 +58,10 @@ const int kHashMask = 0x3fffffff;
 bool hasReceiverArg(Member member) =>
     member.isInstanceMember || (member is Constructor);
 
+// Type arguments to procedures is only supported for factory constructors of
+// generic classes at the moment.
+//
+// TODO(sjindel/tfa): Extend suport to normal generic functions.
 int numTypeParams(Member member) => member is Procedure && member.isFactory
     ? member.function.typeParameters.length
     : 0;
@@ -166,14 +170,6 @@ int typeArgumentsHash(List<DartType> typeArgs) {
     hash = (((hash * 31) & kHashMask) + t.hashCode) & kHashMask;
   }
   return hash;
-}
-
-bool typeArgumentsEquals(List<DartType> x, List<DartType> y) {
-  if (x.length != y.length) return false;
-  for (int i = 0; i < x.length; ++i) {
-    if (x[i] != y[i]) return false;
-  }
-  return true;
 }
 
 class SubtypePair {

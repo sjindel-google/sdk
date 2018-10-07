@@ -12,7 +12,17 @@ import 'package:kernel/ast.dart';
 import 'utils.dart';
 
 abstract class GenericInterfacesInfo {
+  // Return a type arguments vector which contains the immediate type parameters
+  // to 'klass' as well as the type arguments to all generic supertypes of
+  // 'klass', instantiated in terms of the type parameters on 'klass'.
+  //
+  // The offset into this vector from which a specific generic supertype's type
+  // arguments can be found is given by 'genericInterfaceOffsetFor'.
   List<DartType> flattenedTypeArgumentsFor(Class klass);
+
+  // Return the offset into the flattened type arguments vector from which a
+  // specific generic supertype's type arguments can be found. The flattened
+  // type arguments vector is given by 'flattenedTypeArgumentsFor'.
   int genericInterfaceOffsetFor(Class klass, Class iface);
 }
 
@@ -105,7 +115,7 @@ abstract class Type extends TypeExpr {
   // Returns 'true' if this type will definitely pass a runtime type-check
   // against 'runtimeType'. Returns 'false' if the test might fail (e.g. due to
   // an approximation).
-  bool isDefinitelySubtypeOfRuntimeType(
+  bool isSubtypeOfRuntimeType(
       TypeHierarchy typeHierarchy, RuntimeType runtimeType);
 
   @override
@@ -160,8 +170,7 @@ class EmptyType extends Type {
   @override
   Type intersection(Type other, TypeHierarchy typeHierarchy) => this;
 
-  bool isDefinitelySubtypeOfRuntimeType(
-          TypeHierarchy typeHierarchy, RuntimeType other) =>
+  bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) =>
       true;
 }
 
@@ -189,9 +198,8 @@ class NullableType extends Type {
   bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) =>
       baseType.isSubtypeOf(typeHierarchy, dartType);
 
-  bool isDefinitelySubtypeOfRuntimeType(
-          TypeHierarchy typeHierarchy, RuntimeType other) =>
-      baseType.isDefinitelySubtypeOfRuntimeType(typeHierarchy, other);
+  bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) =>
+      baseType.isSubtypeOfRuntimeType(typeHierarchy, other);
 
   @override
   int get order => TypeOrder.Nullable.index;
@@ -264,8 +272,7 @@ class AnyType extends Type {
     return other;
   }
 
-  bool isDefinitelySubtypeOfRuntimeType(
-      TypeHierarchy typeHierarchy, RuntimeType other) {
+  bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) {
     return other._type is DynamicType || other._type is VoidType;
   }
 }
@@ -314,10 +321,8 @@ class SetType extends Type {
   bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) =>
       types.every((ConcreteType t) => t.isSubtypeOf(typeHierarchy, dartType));
 
-  bool isDefinitelySubtypeOfRuntimeType(
-          TypeHierarchy typeHierarchy, RuntimeType other) =>
-      types.every(
-          (t) => t.isDefinitelySubtypeOfRuntimeType(typeHierarchy, other));
+  bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) =>
+      types.every((t) => t.isSubtypeOfRuntimeType(typeHierarchy, other));
 
   @override
   int get order => TypeOrder.Set.index;
@@ -458,8 +463,7 @@ class ConeType extends Type {
   bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) =>
       typeHierarchy.isSubtype(this.dartType, dartType);
 
-  bool isDefinitelySubtypeOfRuntimeType(
-      TypeHierarchy typeHierarchy, RuntimeType other) {
+  bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) {
     if (!typeHierarchy.isSubtype(dartType, other._type)) return false;
     if (dartType is InterfaceType) {
       return (dartType as InterfaceType).classNode.typeParameters.length == 0;
@@ -594,25 +598,17 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
   Class getConcreteClass(TypeHierarchy typeHierarchy) => classNode;
 
   @override
-  bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) {
-    if (typeArgs == null) {
-      return typeHierarchy.isSubtype(InterfaceType(classNode), dartType);
-    } else {
-      // TODO(sjindel/tfa): Take type arguments into account. Currently we only
-      // use this method for checking if a type is a subtype of int.
-      assertx(dartType.toString() == "dart.core::int", details: "$dartType");
-      return false;
-    }
-  }
+  bool isSubtypeOf(TypeHierarchy typeHierarchy, DartType dartType) =>
+      typeHierarchy.isSubtype(InterfaceType(classNode), dartType);
 
-  bool isDefinitelySubtypeOfRuntimeType(
+  bool isSubtypeOfRuntimeType(
       TypeHierarchy typeHierarchy, RuntimeType runtimeType) {
     if (!typeHierarchy.isSubtype(
         InterfaceType(this.classNode), runtimeType._type)) {
       return false;
     }
     if (runtimeType._type is! InterfaceType ||
-        (runtimeType._type as InterfaceType).typeArguments.length == 0) {
+        (runtimeType._type as InterfaceType).typeArguments.isEmpty) {
       return true;
     }
     if (typeArgs == null) return false;
@@ -626,8 +622,8 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
     for (int i = 0; i < runtimeType.numImmediateTypeArgs; ++i) {
       if (typeArgs[i + interfaceOffset] == const AnyType()) return false;
       assertx(typeArgs[i + interfaceOffset] is RuntimeType);
-      if (!typeArgs[i + interfaceOffset].isDefinitelySubtypeOfRuntimeType(
-          typeHierarchy, runtimeType.typeArgs[i])) {
+      if (!typeArgs[i + interfaceOffset]
+          .isSubtypeOfRuntimeType(typeHierarchy, runtimeType.typeArgs[i])) {
         return false;
       }
     }
@@ -758,7 +754,7 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
 // case), so the representation for 'A<String>' would be simply 'AnyType'.
 // However, approximating non-generic types like 'int' and 'num' (the first
 // case) would be too coarse, so we leave an null 'typeArgs' field for these
-// types. As a result, when doing an 'isDefinitelySubtypeOfRuntimeType' against
+// types. As a result, when doing an 'isSubtypeOfRuntimeType' against
 // their interfaces (e.g. 'int' vs 'Comparable<int>') we approximate the result
 // as 'false'.
 //
@@ -774,10 +770,10 @@ class RuntimeType extends Type {
         numImmediateTypeArgs =
             type is InterfaceType ? type.classNode.typeParameters.length : 0 {
     assertx(_type is DynamicType || _type is InterfaceType);
-    if (_type is InterfaceType &&
-        (_type as InterfaceType).typeArguments.length > 0) {
+
+    if (_type is InterfaceType && numImmediateTypeArgs > 0) {
       assertx(typeArgs != null);
-      assertx(typeArgs.length > 0);
+      assertx(typeArgs.length >= numImmediateTypeArgs);
       assertx((_type as InterfaceType)
           .typeArguments
           .every((t) => t == const DynamicType()));
@@ -816,6 +812,7 @@ class RuntimeType extends Type {
   operator ==(other) {
     if (other is RuntimeType) {
       if (other._type != _type) return false;
+      assertx(numImmediateTypeArgs == other.numImmediateTypeArgs);
       for (int i = 0; i < numImmediateTypeArgs; ++i) {
         if (typeArgs[i] != other.typeArgs[i]) return false;
       }
@@ -863,7 +860,7 @@ class RuntimeType extends Type {
   Class getConcreteClass(TypeHierarchy typeHierarchy) =>
       throw "ERROR: ConcreteClass does not support getConcreteClass.";
 
-  bool isDefinitelySubtypeOfRuntimeType(
+  bool isSubtypeOfRuntimeType(
       TypeHierarchy typeHierarchy, RuntimeType runtimeType) {
     if (!typeHierarchy.isSubtype(this._type, runtimeType._type)) return false;
     if (_type is! InterfaceType || runtimeType._type is! InterfaceType) {
@@ -880,8 +877,8 @@ class RuntimeType extends Type {
       assertx(typeArgs.length - interfaceOffset >=
           runtimeType.numImmediateTypeArgs);
       for (int i = 0; i < runtimeType.numImmediateTypeArgs; ++i) {
-        if (!typeArgs[interfaceOffset + i].isDefinitelySubtypeOfRuntimeType(
-            typeHierarchy, runtimeType.typeArgs[i])) {
+        if (!typeArgs[interfaceOffset + i]
+            .isSubtypeOfRuntimeType(typeHierarchy, runtimeType.typeArgs[i])) {
           return false;
         }
       }

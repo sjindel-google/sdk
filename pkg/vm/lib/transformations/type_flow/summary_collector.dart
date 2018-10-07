@@ -272,7 +272,7 @@ class _FallthroughDetector extends ast.StatementVisitor<bool> {
   bool visitFunctionDeclaration(FunctionDeclaration node) => true;
 }
 
-enum FieldSummaryType { kSetter, kInitializer }
+enum FieldSummaryType { kFieldGuard, kInitializer }
 
 /// Create a type flow summary for a member from the kernel AST.
 class SummaryCollector extends RecursiveVisitor<TypeExpr> {
@@ -314,9 +314,9 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     final hasReceiver = hasReceiverArg(member);
 
     if (member is Field) {
-      int numArgs = fieldSummaryType == FieldSummaryType.kInitializer ? 1 : 2;
-
       if (hasReceiver) {
+        final int numArgs =
+            fieldSummaryType == FieldSummaryType.kInitializer ? 1 : 2;
         _summary = new Summary(
             parameterCount: numArgs, positionalParameterCount: numArgs);
         // TODO(alexmarkov): subclass cone
@@ -345,7 +345,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       FunctionNode function = member.function;
 
       final numTypeParameters = numTypeParams(member);
-      final firstParamIndex = hasReceiver ? 1 : numTypeParameters;
+      final firstParamIndex = (hasReceiver ? 1 : 0) + numTypeParameters;
 
       _summary = new Summary(
           parameterCount: firstParamIndex +
@@ -357,7 +357,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
               firstParamIndex + function.requiredParameterCount);
 
       if (numTypeParameters > 0) {
-        assertx(!hasReceiver);
         _fnTypeVariables = <TypeParameter, TypeExpr>{};
         for (int i = 0; i < numTypeParameters; ++i) {
           _fnTypeVariables[function.typeParameters[i]] =
@@ -366,7 +365,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       }
 
       if (hasReceiver) {
-        assertx(numTypeParameters == 0);
         // TODO(alexmarkov): subclass cone
         _receiver = _declareParameter(
             "this", member.enclosingClass.rawType, null,
@@ -1359,7 +1357,7 @@ class _RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
     // access to the type parameters when invoking a method from the interface.
     // However, fixing this also requires calling instantiateConcreteType in
     // many more places than we do already.
-    if (typeArgs.length == 0) return type;
+    if (typeArgs.isEmpty) return type;
 
     // This function is very similar to 'visitInterfaceType', but with
     // many small differences.
@@ -1429,7 +1427,7 @@ class _RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
     // As with 'instantiateConcreteType', this is an approximation. However, in
     // this case we perform it to avoid approximating super-bounded non-generic
     // types with 'AnyType'. See 'RuntimeType' for more details.
-    if (type.typeArguments.length == 0) {
+    if (type.typeArguments.isEmpty) {
       return new RuntimeType(type, null);
     }
 

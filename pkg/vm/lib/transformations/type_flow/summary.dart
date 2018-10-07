@@ -402,8 +402,7 @@ class TypeCheck extends Statement {
       canSkip = false;
       return argType;
     } else {
-      canSkip =
-          argType.isDefinitelySubtypeOfRuntimeType(typeHierarchy, checkType);
+      canSkip = argType.isSubtypeOfRuntimeType(typeHierarchy, checkType);
       if (kPrintTrace && !canSkip) {
         tracePrint("TypeCheck of $argType against $checkType failed.");
       }
