@@ -267,7 +267,6 @@ main() {
     final t1a = new InterfaceType(c1);
     final t1b = new InterfaceType(c1);
     final t2 = new InterfaceType(c2);
-    final t3 = new InterfaceType(c3);
     final f1a = new FunctionType([t1a], const VoidType());
     final f1b = new FunctionType([t1b], const VoidType());
     final f2 = new FunctionType([t1a, t1a], const VoidType());
