@@ -151,8 +151,8 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
     }
 
     List<DartType> typeArgs;
-    if (type is ConcreteType && type.ct_typeArgs != null) {
-      typeArgs = type.ct_typeArgs
+    if (type is ConcreteType && type.typeArgs != null) {
+      typeArgs = type.typeArgs
           .take(type.numImmediateTypeArgs)
           .map((t) => t is AnyType ? null : (t as RuntimeType).representedType)
           .toList();

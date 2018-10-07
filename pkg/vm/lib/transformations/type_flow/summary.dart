@@ -289,10 +289,10 @@ class Extract extends Statement {
       CallHandler callHandler) {
     Type argType = arg.getComputedType(computedTypes);
     if (argType is ConcreteType) {
-      if (argType.ct_typeArgs == null) return const AnyType();
+      if (argType.typeArgs == null) return const AnyType();
       final interfaceOffset = typeHierarchy.genericInterfaceOffsetFor(
           argType.classNode, referenceClass);
-      final result = argType.ct_typeArgs[interfaceOffset + paramIndex];
+      final result = argType.typeArgs[interfaceOffset + paramIndex];
       assertx(result is AnyType || result is RuntimeType);
       return result;
     }
