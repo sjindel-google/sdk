@@ -56,6 +56,37 @@ RESULT: _T {}?
 %this = _Parameter #0 [_T (#lib::Z)+]
 t1 = _Call direct [#lib::X::] (%this)
 RESULT: _T {}?
+------------ #lib::I:: ------------
+%this = _Parameter #0 [_T (#lib::I<dynamic>)+]
+t1 = _Call direct [dart.core::Object::] (%this)
+RESULT: _T {}?
+------------ #lib::J:: ------------
+%this = _Parameter #0 [_T (#lib::J)+]
+t1 = _Call direct [#lib::I::] (%this)
+RESULT: _T {}?
+------------ #lib::K:: ------------
+%this = _Parameter #0 [_T (#lib::K<dynamic>)+]
+t1 = _Call direct [dart.core::Object::] (%this)
+RESULT: _T {}?
+------------ #lib::C2:: ------------
+%this = _Parameter #0 [_T (#lib::C2<dynamic>)+]
+t1 = _Call direct [dart.core::Object::] (%this)
+RESULT: _T {}?
+------------ #lib::C2::id3 ------------
+%this = _Parameter #0 [_T (#lib::C2<dynamic>)+]
+%x = _Parameter #1 [_T (dart.core::Comparable<dynamic>)+?]
+t2 = _Extract (%this[#lib::C2/0])
+t3 = _CreateRuntimeType (dart.core::Comparable @ (t2))
+t4 = _TypeCheck (%x against t3)
+RESULT: t4
+------------ #lib::C2::id4 ------------
+%this = _Parameter #0 [_T (#lib::C2<dynamic>)+]
+%x = _Parameter #1 [_T (#lib::K<dynamic>)+?]
+t2 = _Extract (%this[#lib::C2/0])
+t3 = _CreateRuntimeType (#lib::I @ (t2))
+t4 = _CreateRuntimeType (#lib::K @ (t3))
+t5 = _TypeCheck (%x against t4)
+RESULT: t5
 ------------ #lib::main ------------
 t0 = _Call direct [#lib::C::] (_T (#lib::C<dart.core::int>))
 t1* = _Call [#lib::C::foo] (_T (#lib::C<dart.core::int>))
@@ -70,5 +101,9 @@ t9 = _Call direct [#lib::Y::] (_T (#lib::Y))
 t10 = _Call [#lib::C::id1] (_T (#lib::C<#lib::Y>), _T (#lib::Y))
 t11 = _Call direct [#lib::Z::] (_T (#lib::Z))
 t12 = _Call [#lib::C::id2] (_T (#lib::C<#lib::Y>), _T (#lib::Z))
+t13 = _Call direct [#lib::C2::] (_T (#lib::C2<dart.core::num>))
+t14 = _Call [#lib::C2::id3] (_T (#lib::C2<dart.core::num>), _T (dart.core::double)+)
+t15 = _Call direct [#lib::K::] (_T (#lib::K<#lib::J>))
+t16 = _Call [#lib::C2::id4] (_T (#lib::C2<dart.core::num>), _T (#lib::K<#lib::J>))
 used = _Join [dynamic] (_T {}?, t1, t3, t5, t7)
 RESULT: used

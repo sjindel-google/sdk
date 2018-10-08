@@ -28,7 +28,7 @@ class K<T> {}
 
 class C2<T> {
   dynamic id3(Comparable<T> x) => x;
-  dynamic id4(K<I<int>> x) => x;
+  dynamic id4(K<I<T>> x) => x;
 }
 
 main() {
