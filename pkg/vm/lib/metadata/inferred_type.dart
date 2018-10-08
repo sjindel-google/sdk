@@ -9,7 +9,7 @@ import 'package:kernel/ast.dart';
 /// Metadata for annotating nodes with an inferred type information.
 class InferredType {
   final Reference _concreteClassReference;
-  int _flags;
+  final int _flags;
 
   static const int flagNullable = 1 << 0;
   static const int flagInt = 1 << 1;
@@ -47,8 +47,6 @@ class InferredType {
   bool get nullable => (_flags & flagNullable) != 0;
   bool get isInt => (_flags & flagInt) != 0;
   bool get skipCheck => (_flags & flagSkipCheck) != 0;
-
-  set skipCheck(bool value) => _flags |= (value ? flagSkipCheck : 0);
 
   @override
   String toString() {

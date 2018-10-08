@@ -1158,12 +1158,15 @@ class _ClassHierarchyCache implements TypeHierarchy {
     }
   }
 
+  @override
   List<DartType> flattenedTypeArgumentsFor(Class klass) =>
       genericInterfacesInfo.flattenedTypeArgumentsFor(klass);
 
+  @override
   int genericInterfaceOffsetFor(Class klass, Class iface) =>
       genericInterfacesInfo.genericInterfaceOffsetFor(klass, iface);
 
+  @override
   List<RuntimeType> flattenedTypeArgumentsForNonGeneric(Class klass) =>
       genericInterfacesInfo.flattenedTypeArgumentsForNonGeneric(klass);
 

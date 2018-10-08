@@ -318,7 +318,7 @@ class CreateConcreteType extends Statement {
   @override
   String dump() {
     int numImmediateTypeArgs = type.classNode.typeParameters.length;
-    return "$label = _CreateConcreteType (${type.getConcreteClass(null)} @ "
+    return "$label = _CreateConcreteType (${type.classNode} @ "
         "${flattenedTypeArgs.take(numImmediateTypeArgs)})";
   }
 
@@ -383,7 +383,13 @@ class TypeCheck extends Statement {
   void accept(StatementVisitor visitor) => visitor.visitTypeCheck(this);
 
   @override
-  String dump() => "$label = _TypeCheck ($arg against $type)";
+  String dump() {
+    String result = "$label = _TypeCheck ($arg against $type)";
+    if (parameter != null) {
+      result += " (for parameter ${parameter.name})";
+    }
+    return result;
+  }
 
   @override
   Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,

@@ -129,7 +129,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
     component.addMetadataRepository(_procedureAttributesMetadata);
   }
 
-  InferredType _convertType(Type type) {
+  InferredType _convertType(Type type, {bool skipCheck: false}) {
     assertx(type != null);
 
     Class concreteClass;
@@ -160,7 +160,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
 
     if ((concreteClass != null) || !nullable || isInt) {
       return new InferredType(concreteClass, nullable, isInt,
-          exactTypeArguments: typeArgs);
+          exactTypeArguments: typeArgs, skipCheck: skipCheck);
     }
 
     return null;
@@ -168,9 +168,9 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
 
   void _setInferredType(TreeNode node, Type type, {bool skipCheck: false}) {
     assertx(skipCheck == false || node is VariableDeclaration || node is Field);
-    final inferredType = _convertType(type);
+    final inferredType = _convertType(type, skipCheck: skipCheck);
     if (inferredType != null) {
-      _inferredTypeMetadata.mapping[node] = inferredType..skipCheck = skipCheck;
+      _inferredTypeMetadata.mapping[node] = inferredType;
     }
   }
 
