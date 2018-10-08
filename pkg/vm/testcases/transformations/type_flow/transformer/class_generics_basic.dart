@@ -23,7 +23,9 @@ class Y extends X {}
 class Z extends X {}
 
 class I<T> {}
+
 class J extends I<int> {}
+
 class K<T> {}
 
 class C2<T> {
