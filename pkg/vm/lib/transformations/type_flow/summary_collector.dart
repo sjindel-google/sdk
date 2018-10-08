@@ -291,7 +291,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   Join _returnValue;
   Parameter _receiver;
   ConstantAllocationCollector constantAllocationCollector;
-  _RuntimeTypeTranslator _translator;
+  RuntimeTypeTranslator _translator;
 
   // Currently only used for factory constructors.
   Map<TypeParameter, TypeExpr> _fnTypeVariables;
@@ -328,7 +328,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         _summary = new Summary();
       }
 
-      _translator = new _RuntimeTypeTranslator(member.enclosingClass, _summary,
+      _translator = new RuntimeTypeTranslator(member.enclosingClass, _summary,
           _receiver, null, _genericInterfacesInfo);
 
       if (fieldSummaryType == FieldSummaryType.kInitializer) {
@@ -372,7 +372,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
         _environment.thisType = member.enclosingClass?.thisType;
       }
 
-      _translator = new _RuntimeTypeTranslator(member.enclosingClass, _summary,
+      _translator = new RuntimeTypeTranslator(member.enclosingClass, _summary,
           _receiver, _fnTypeVariables, _genericInterfacesInfo);
 
       for (VariableDeclaration param in function.positionalParameters) {
@@ -1339,7 +1339,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   }
 }
 
-class _RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
+class RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
   final Class enclosingClass;
   final Summary summary;
   final Map<TypeParameter, TypeExpr> functionTypeVariables;
@@ -1347,16 +1347,19 @@ class _RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
   final TypeExpr receiver;
   final GenericInterfacesInfo genericInterfacesInfo;
 
-  _RuntimeTypeTranslator(this.enclosingClass, this.summary, this.receiver,
+  RuntimeTypeTranslator(this.enclosingClass, this.summary, this.receiver,
       this.functionTypeVariables, this.genericInterfacesInfo);
 
+  // Create a type translator which can be used only for types with no free type
+  // variables.
+  RuntimeTypeTranslator.forClosedTypes()
+      : enclosingClass = null,
+        summary = null,
+        functionTypeVariables = null,
+        receiver = null,
+        genericInterfacesInfo = null {}
+
   TypeExpr instantiateConcreteType(ConcreteType type, List<DartType> typeArgs) {
-    // TODO(sjindel/tfa): This is actually an approximation.
-    //
-    // A non-generic type can implement a generic interface, and we would like
-    // access to the type parameters when invoking a method from the interface.
-    // However, fixing this also requires calling instantiateConcreteType in
-    // many more places than we do already.
     if (typeArgs.isEmpty) return type;
 
     // This function is very similar to 'visitInterfaceType', but with
@@ -1412,24 +1415,22 @@ class _RuntimeTypeTranslator extends DartTypeVisitor<TypeExpr> {
     return result;
   }
 
-  // TODO(sjindel/tfa): Handle void/bottom.
   @override
   TypeExpr defaultDartType(DartType node) => const AnyType();
 
   @override
   TypeExpr visitDynamicType(DynamicType type) => new RuntimeType(type, null);
+  @override
+  TypeExpr visitVoidType(VoidType type) => new RuntimeType(type, null);
+  @override
+  TypeExpr visitBottomType(BottomType type) => new RuntimeType(type, null);
 
   @override
   visitTypedefType(TypedefType node) => translate(node.unalias);
 
   @override
   visitInterfaceType(InterfaceType type) {
-    // As with 'instantiateConcreteType', this is an approximation. However, in
-    // this case we perform it to avoid approximating super-bounded non-generic
-    // types with 'AnyType'. See 'RuntimeType' for more details.
-    if (type.typeArguments.isEmpty) {
-      return new RuntimeType(type, null);
-    }
+    if (type.typeArguments.isEmpty) return new RuntimeType(type, null);
 
     final substitution = Substitution.fromPairs(
         type.classNode.typeParameters, type.typeArguments);

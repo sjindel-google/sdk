@@ -22,6 +22,15 @@ class Y extends X {}
 
 class Z extends X {}
 
+class I<T> {}
+class J extends I<int> {}
+class K<T> {}
+
+class C2<T> {
+  dynamic id3(Comparable<T> x) => x;
+  dynamic id4(K<I<int>> x) => x;
+}
+
 main() {
   // Test that type arguments are instantiated correctly on concrete types.
   dynamic used;
@@ -34,6 +43,11 @@ main() {
   C<X> c = new C<Y>();
   c.id1(Y());
   c.id2(Z());
+
+  // Test that generic supertypes of non-generic types are handled correctly.
+  C2<num> c2 = new C2<num>();
+  c2.id3(3.0);
+  c2.id4(K<J>());
 
   return used;
 }

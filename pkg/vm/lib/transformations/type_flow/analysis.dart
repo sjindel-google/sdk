@@ -880,11 +880,13 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
 
   final supertypeOffsetsCache = <SubtypePair, int>{};
   final cachedFlattenedTypeArgs = <Class, List<DartType>>{};
+  final cachedFlattenedTypeArgsForNonGeneric = <Class, List<RuntimeType>>{};
+  final closedTypeTranslator = RuntimeTypeTranslator.forClosedTypes();
 
   GenericInterfacesInfoImpl(this.hierarchy);
 
-  List<DartType> flattenedTypeArgumentsFor(Class klass) {
-    final cached = cachedFlattenedTypeArgs[klass];
+  List<DartType> flattenedTypeArgumentsFor(Class klass, {bool useCache: true}) {
+    final cached = useCache ? cachedFlattenedTypeArgs[klass] : null;
     if (cached != null) return cached;
 
     List<Supertype> rawGenericInterfaces = hierarchy.genericSupertypesOf(klass);
@@ -924,7 +926,9 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
       backward.remove(typeArgs);
     }
 
-    cachedFlattenedTypeArgs[klass] = flattened;
+    if (useCache) {
+      cachedFlattenedTypeArgs[klass] = flattened;
+    }
     return flattened;
   }
 
@@ -940,6 +944,22 @@ class GenericInterfacesInfoImpl implements GenericInterfacesInfo {
     }
 
     return offset;
+  }
+
+  List<RuntimeType> flattenedTypeArgumentsForNonGeneric(Class klass) {
+    List<RuntimeType> result = cachedFlattenedTypeArgsForNonGeneric[klass];
+    if (result != null) return result;
+
+    List<DartType> flattenedTypeArgs =
+        flattenedTypeArgumentsFor(klass, useCache: false);
+    result = new List<Type>(flattenedTypeArgs.length);
+    for (int i = 0; i < flattenedTypeArgs.length; ++i) {
+      final translated = closedTypeTranslator.translate(flattenedTypeArgs[i]);
+      assertx(translated is RuntimeType || translated is AnyType);
+      result[i] = translated;
+    }
+    cachedFlattenedTypeArgsForNonGeneric[klass] = result;
+    return result;
   }
 }
 
@@ -1143,6 +1163,9 @@ class _ClassHierarchyCache implements TypeHierarchy {
 
   int genericInterfaceOffsetFor(Class klass, Class iface) =>
       genericInterfacesInfo.genericInterfaceOffsetFor(klass, iface);
+
+  List<RuntimeType> flattenedTypeArgumentsForNonGeneric(Class klass) =>
+      genericInterfacesInfo.flattenedTypeArgumentsForNonGeneric(klass);
 
   @override
   String toString() {

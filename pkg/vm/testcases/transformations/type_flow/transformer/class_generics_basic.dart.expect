@@ -44,6 +44,24 @@ class Z extends self::X {
     : super self::X::•()
     ;
 }
+abstract class I<T extends core::Object = dynamic> extends core::Object {
+}
+abstract class J extends self::I<core::int> {
+}
+class K<T extends core::Object = dynamic> extends core::Object {
+  synthetic constructor •() → self::K<self::K::T>
+    : super core::Object::•()
+    ;
+}
+class C2<T extends core::Object = dynamic> extends core::Object {
+  synthetic constructor •() → self::C2<self::C2::T>
+    : super core::Object::•()
+    ;
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasThisUses:false,hasTearOffUses:false]  method id3([@vm.inferred-type.metadata=dart.core::_Double (skip check)] generic-covariant-impl core::Comparable<self::C2::T> x) → dynamic
+    return x;
+[@vm.procedure-attributes.metadata=hasDynamicUses:false,hasThisUses:false,hasTearOffUses:false]  method id4([@vm.inferred-type.metadata=#lib::K<#lib::J>] self::K<self::I<core::int>> x) → dynamic
+    return x;
+}
 static method main() → dynamic {
   dynamic used;
   used = [@vm.direct-call.metadata=#lib::C::foo] [@vm.inferred-type.metadata=#lib::D<dart.core::int>] new self::C::•<core::int>().{self::C::foo}();
@@ -53,5 +71,8 @@ static method main() → dynamic {
   self::C<self::X> c = new self::C::•<self::Y>();
   [@vm.call-site-attributes.metadata=receiverType:#lib::C<#lib::X>] [@vm.direct-call.metadata=#lib::C::id1] c.{self::C::id1}(new self::Y::•());
   [@vm.call-site-attributes.metadata=receiverType:#lib::C<#lib::X>] [@vm.direct-call.metadata=#lib::C::id2] c.{self::C::id2}(new self::Z::•());
+  self::C2<core::num> c2 = new self::C2::•<core::num>();
+  [@vm.call-site-attributes.metadata=receiverType:#lib::C2<dart.core::num>] [@vm.direct-call.metadata=#lib::C2::id3] c2.{self::C2::id3}(3.0);
+  [@vm.direct-call.metadata=#lib::C2::id4] c2.{self::C2::id4}(new self::K::•<self::J>());
   return used;
 }

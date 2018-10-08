@@ -24,6 +24,14 @@ abstract class GenericInterfacesInfo {
   // specific generic supertype's type arguments can be found. The flattened
   // type arguments vector is given by 'flattenedTypeArgumentsFor'.
   int genericInterfaceOffsetFor(Class klass, Class iface);
+
+  // Similar to 'flattenedTypeArgumentsFor', but works for non-generic classes
+  // which may have recursive substitutions, e.g. 'class num implements
+  // Comparable<num>'.
+  //
+  // Since there are no free type variables in the result, 'RuntimeType' is
+  // returned instead of 'DartType'.
+  List<Type> flattenedTypeArgumentsForNonGeneric(Class klass);
 }
 
 /// Abstract interface to type hierarchy information used by types.
@@ -170,8 +178,9 @@ class EmptyType extends Type {
   @override
   Type intersection(Type other, TypeHierarchy typeHierarchy) => this;
 
-  bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) =>
-      true;
+  bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) {
+    return true;
+  }
 }
 
 /// Nullable type represents a union of a (non-nullable) type and the `null`
@@ -273,7 +282,7 @@ class AnyType extends Type {
   }
 
   bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) {
-    return other._type is DynamicType || other._type is VoidType;
+    return typeHierarchy.isSubtype(const DynamicType(), other._type);
   }
 }
 
@@ -466,7 +475,7 @@ class ConeType extends Type {
   bool isSubtypeOfRuntimeType(TypeHierarchy typeHierarchy, RuntimeType other) {
     if (!typeHierarchy.isSubtype(dartType, other._type)) return false;
     if (dartType is InterfaceType) {
-      return (dartType as InterfaceType).classNode.typeParameters.length == 0;
+      return (dartType as InterfaceType).classNode.typeParameters.isEmpty;
     }
     return true;
   }
@@ -607,22 +616,31 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
         InterfaceType(this.classNode), runtimeType._type)) {
       return false;
     }
+
+    // The TypeHierarchy result may be inaccurate only if there are type
+    // arguments which it doesn't examine.
     if (runtimeType._type is! InterfaceType ||
         (runtimeType._type as InterfaceType).typeArguments.isEmpty) {
       return true;
     }
-    if (typeArgs == null) return false;
+
+    List<Type> usableTypeArgs = typeArgs;
+    if (usableTypeArgs == null) {
+      assertx(classNode.typeParameters.isEmpty);
+      usableTypeArgs =
+          typeHierarchy.flattenedTypeArgumentsForNonGeneric(classNode);
+    }
 
     final interfaceOffset = typeHierarchy.genericInterfaceOffsetFor(
         classNode, (runtimeType._type as InterfaceType).classNode);
 
-    assertx(
-        typeArgs.length - interfaceOffset >= runtimeType.numImmediateTypeArgs);
+    assertx(usableTypeArgs.length - interfaceOffset >=
+        runtimeType.numImmediateTypeArgs);
 
     for (int i = 0; i < runtimeType.numImmediateTypeArgs; ++i) {
-      if (typeArgs[i + interfaceOffset] == const AnyType()) return false;
-      assertx(typeArgs[i + interfaceOffset] is RuntimeType);
-      if (!typeArgs[i + interfaceOffset]
+      if (usableTypeArgs[i + interfaceOffset] == const AnyType()) return false;
+      assertx(usableTypeArgs[i + interfaceOffset] is RuntimeType);
+      if (!usableTypeArgs[i + interfaceOffset]
           .isSubtypeOfRuntimeType(typeHierarchy, runtimeType.typeArgs[i])) {
         return false;
       }
@@ -762,6 +780,7 @@ class ConcreteType extends Type implements Comparable<ConcreteType> {
 // is non-generic, and non-null (with at least one vector) otherwise.
 class RuntimeType extends Type {
   final DartType _type; // Doesn't contain type args.
+
   final int numImmediateTypeArgs;
   final List<RuntimeType> typeArgs;
 
@@ -769,8 +788,6 @@ class RuntimeType extends Type {
       : _type = type,
         numImmediateTypeArgs =
             type is InterfaceType ? type.classNode.typeParameters.length : 0 {
-    assertx(_type is DynamicType || _type is InterfaceType);
-
     if (_type is InterfaceType && numImmediateTypeArgs > 0) {
       assertx(typeArgs != null);
       assertx(typeArgs.length >= numImmediateTypeArgs);
@@ -813,10 +830,7 @@ class RuntimeType extends Type {
     if (other is RuntimeType) {
       if (other._type != _type) return false;
       assertx(numImmediateTypeArgs == other.numImmediateTypeArgs);
-      for (int i = 0; i < numImmediateTypeArgs; ++i) {
-        if (typeArgs[i] != other.typeArgs[i]) return false;
-      }
-      return true;
+      return typeArgs == null || listEquals(typeArgs, other.typeArgs);
     }
     return false;
   }
@@ -863,24 +877,30 @@ class RuntimeType extends Type {
   bool isSubtypeOfRuntimeType(
       TypeHierarchy typeHierarchy, RuntimeType runtimeType) {
     if (!typeHierarchy.isSubtype(this._type, runtimeType._type)) return false;
-    if (_type is! InterfaceType || runtimeType._type is! InterfaceType) {
+
+    // The typeHierarchy result maybe be inaccurate only if there are type
+    // arguments which need to be examined.
+    if (_type is! InterfaceType || runtimeType.numImmediateTypeArgs == 0) {
       return true;
     }
 
     final thisClass = (_type as InterfaceType).classNode;
     final otherClass = (runtimeType._type as InterfaceType).classNode;
 
-    if (numImmediateTypeArgs > 0) {
-      if (typeArgs == null) return false;
-      final interfaceOffset =
-          typeHierarchy.genericInterfaceOffsetFor(thisClass, otherClass);
-      assertx(typeArgs.length - interfaceOffset >=
-          runtimeType.numImmediateTypeArgs);
-      for (int i = 0; i < runtimeType.numImmediateTypeArgs; ++i) {
-        if (!typeArgs[interfaceOffset + i]
-            .isSubtypeOfRuntimeType(typeHierarchy, runtimeType.typeArgs[i])) {
-          return false;
-        }
+    List<Type> usableTypeArgs = typeArgs;
+    if (usableTypeArgs == null) {
+      assertx(thisClass.typeParameters.isEmpty);
+      usableTypeArgs =
+          typeHierarchy.flattenedTypeArgumentsForNonGeneric(thisClass);
+    }
+    final interfaceOffset =
+        typeHierarchy.genericInterfaceOffsetFor(thisClass, otherClass);
+    assertx(usableTypeArgs.length - interfaceOffset >=
+        runtimeType.numImmediateTypeArgs);
+    for (int i = 0; i < runtimeType.numImmediateTypeArgs; ++i) {
+      if (!usableTypeArgs[interfaceOffset + i]
+          .isSubtypeOfRuntimeType(typeHierarchy, runtimeType.typeArgs[i])) {
+        return false;
       }
     }
     return true;
