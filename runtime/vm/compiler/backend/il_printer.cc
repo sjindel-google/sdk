@@ -96,9 +96,21 @@ void FlowGraphPrinter::PrintBlock(BlockEntryInstr* block,
   }
 }
 
+static void EnsureIdentifier(char* label) {
+  for (char c = *label; c != '\0'; c = *++label) {
+    if (((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) ||
+        ((c >= '0') && (c <= '9'))) {
+      continue;
+    }
+    *label = '_';
+  }
+}
+
 void FlowGraphPrinter::PrintBlocks() {
   if (!function_.IsNull()) {
-    THR_Print("==== %s\n", function_.ToFullyQualifiedCString());
+    const char* label = function_.ToQualifiedCString();
+    EnsureIdentifier(const_cast<char*>(label));
+    THR_Print("==== %s\n", label);
   }
 
   for (intptr_t i = 0; i < block_order_.length(); ++i) {
