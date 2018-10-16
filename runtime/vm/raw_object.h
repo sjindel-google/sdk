@@ -1410,6 +1410,7 @@ class RawCode : public RawObject {
   // 'unchecked_entry_point_' will refer to the same position as 'entry_point_'.
   //
   uword unchecked_entry_point_;  // Accessed from generated code.
+  uword monomorphic_unchecked_entry_point_;  // Accessed from generated code.
 
   VISIT_FROM(RawObject*, object_pool_);
   RawObjectPool* object_pool_;     // Accessed from generated code.
