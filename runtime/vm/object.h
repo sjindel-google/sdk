@@ -4367,7 +4367,8 @@ class Instructions : public Object {
   }
 
   static uword UncheckedEntryPoint(const RawInstructions* instr) {
-    uword entry = PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
+    uword entry =
+        PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
     if (!HasSingleEntryPoint(instr)) {
       entry += kUncheckedEntryOffset;
     }
@@ -4375,7 +4376,8 @@ class Instructions : public Object {
   }
 
   static uword MonomorphicUncheckedEntryPoint(const RawInstructions* instr) {
-    uword entry = PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
+    uword entry =
+        PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
     if (!HasSingleEntryPoint(instr)) {
       entry += kCheckedEntryOffset;
     }
