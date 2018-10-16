@@ -1784,8 +1784,6 @@ StreamingFlowGraphBuilder::ChooseEntryPointStyle(
   return UncheckedEntryPointStyle::kSeparate;
 }
 
-volatile int ctr  =0;
-
 FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
     bool is_constructor) {
   // The prologue builder needs the default parameter values.
@@ -3103,8 +3101,7 @@ Fragment StreamingFlowGraphBuilder::BuildPropertySet(TokenPosition* p) {
         position, *mangled_name, Token::kSET, kTypeArgsLen, 2,
         Array::null_array(), kNumArgsChecked, *interface_target,
         /*result_type=*/nullptr,
-        /*use_unchecked_entry=*/is_unchecked_call,
-        &call_site_attributes);
+        /*use_unchecked_entry=*/is_unchecked_call, &call_site_attributes);
   }
 
   instructions += Drop();  // Drop result of the setter invocation.
