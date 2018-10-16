@@ -3087,12 +3087,12 @@ Fragment StreamingFlowGraphBuilder::BuildPropertySet(TokenPosition* p) {
   }
 
   if (!direct_call_target->IsNull()) {
-    // TODO(#34162): Pass 'is_unchecked_call' down if/when we feature multiple
-    // entry-points in AOT.
     ASSERT(FLAG_precompiled_mode);
     instructions +=
         StaticCall(position, *direct_call_target, 2, Array::null_array(),
-                   ICData::kNoRebind, /*result_type=*/nullptr);
+                   ICData::kNoRebind, /*result_type=*/nullptr,
+                   /*type_args_count=*/0,
+                   /*use_unchecked_entry=*/is_unchecked_call);
   } else {
     const intptr_t kTypeArgsLen = 0;
     const intptr_t kNumArgsChecked = 1;
@@ -3101,7 +3101,7 @@ Fragment StreamingFlowGraphBuilder::BuildPropertySet(TokenPosition* p) {
         position, *mangled_name, Token::kSET, kTypeArgsLen, 2,
         Array::null_array(), kNumArgsChecked, *interface_target,
         /*result_type=*/nullptr,
-        /*use_unchecked_entry=*/!FLAG_precompiled_mode && is_unchecked_call,
+        /*use_unchecked_entry=*/is_unchecked_call,
         &call_site_attributes);
   }
 
@@ -3674,24 +3674,19 @@ Fragment StreamingFlowGraphBuilder::BuildMethodInvocation(TokenPosition* p) {
         B->ClosureCall(position, type_args_len, argument_count, argument_names,
                        /*use_unchecked_entry=*/true);
   } else if (!direct_call_target->IsNull()) {
-    // TODO(#34162): Pass 'is_unchecked_call' down if/when we feature multiple
-    // entry-points in AOT.
-
     // Even if TFA infers a concrete receiver type, the static type of the
     // call-site may still be dynamic and we need to call the dynamic invocation
     // forwarder to ensure type-checks are performed.
     ASSERT(FLAG_precompiled_mode);
-    instructions += StaticCall(position, *direct_call_target, argument_count,
-                               argument_names, ICData::kNoRebind, &result_type,
-                               type_args_len);
+    instructions +=
+        StaticCall(position, *direct_call_target, argument_count,
+                   argument_names, ICData::kNoRebind, &result_type,
+                   type_args_len, /*use_unchecked_entry=*/is_unchecked_call);
   } else {
-    // TODO(#34162): Pass 'is_unchecked_call' down if/when we feature multiple
-    // entry-points in AOT.
     instructions += InstanceCall(
         position, *mangled_name, token_kind, type_args_len, argument_count,
         argument_names, checked_argument_count, *interface_target, &result_type,
-        /*use_unchecked_entry=*/!FLAG_precompiled_mode && is_unchecked_call,
-        &call_site_attributes);
+        /*use_unchecked_entry=*/is_unchecked_call, &call_site_attributes);
   }
 
   // Drop temporaries preserving result on the top of the stack.

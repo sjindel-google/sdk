@@ -4308,6 +4308,7 @@ class Instructions : public Object {
     return SizeBits::decode(instr->ptr()->size_and_flags_);
   }
 
+  // SAMIR_TODO: rename this confusing function
   bool HasSingleEntryPoint() const {
     return FlagsBits::decode(raw_ptr()->size_and_flags_);
   }
@@ -4366,7 +4367,19 @@ class Instructions : public Object {
   }
 
   static uword UncheckedEntryPoint(const RawInstructions* instr) {
-    return PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
+    uword entry = PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
+    if (!HasSingleEntryPoint(instr)) {
+      entry += kUncheckedEntryOffset;
+    }
+    return entry;
+  }
+
+  static uword MonomorphicUncheckedEntryPoint(const RawInstructions* instr) {
+    uword entry = PayloadStart(instr) + instr->ptr()->unchecked_entrypoint_pc_offset_;
+    if (!HasSingleEntryPoint(instr)) {
+      entry += kCheckedEntryOffset;
+    }
+    return entry;
   }
 
   static const intptr_t kMaxElements =
@@ -4827,6 +4840,7 @@ class Code : public Object {
     kNormal,
     kUnchecked,
     kMonomorphic,
+    kMonomorphicUnchecked,
   };
 
   static intptr_t entry_point_offset(EntryKind kind = EntryKind::kNormal) {
@@ -4837,6 +4851,8 @@ class Code : public Object {
         return OFFSET_OF(RawCode, unchecked_entry_point_);
       case EntryKind::kMonomorphic:
         return OFFSET_OF(RawCode, monomorphic_entry_point_);
+      case EntryKind::kMonomorphicUnchecked:
+        return OFFSET_OF(RawCode, monomorphic_unchecked_entry_point_);
       default:
         UNREACHABLE();
     }
@@ -4878,8 +4894,10 @@ class Code : public Object {
     return Instructions::UncheckedEntryPoint(instructions());
   }
   uword MonomorphicEntryPoint() const {
-    const Instructions& instr = Instructions::Handle(instructions());
-    return instr.MonomorphicEntryPoint();
+    return Instructions::MonomorphicEntryPoint(instructions());
+  }
+  uword MonomorphicUncheckedEntryPoint() const {
+    return Instructions::MonomorphicUncheckedEntryPoint(instructions());
   }
   intptr_t Size() const { return Instructions::Size(instructions()); }
   RawObjectPool* GetObjectPool() const { return object_pool(); }

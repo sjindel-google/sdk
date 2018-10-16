@@ -1434,6 +1434,8 @@ class CodeDeserializationCluster : public DeserializationCluster {
       code->ptr()->instructions_ = instr;
       code->ptr()->unchecked_entry_point_ =
           Instructions::UncheckedEntryPoint(instr);
+      code->ptr()->monomorphic_unchecked_entry_point_ =
+          Instructions::MonomorphicUncheckedEntryPoint(instr);
 
 #if !defined(DART_PRECOMPILED_RUNTIME)
       if (d->kind() == Snapshot::kFullJIT) {
