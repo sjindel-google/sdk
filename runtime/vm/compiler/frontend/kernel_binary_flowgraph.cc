@@ -1784,6 +1784,8 @@ StreamingFlowGraphBuilder::ChooseEntryPointStyle(
   return UncheckedEntryPointStyle::kSeparate;
 }
 
+volatile int ctr  =0;
+
 FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfFunction(
     bool is_constructor) {
   // The prologue builder needs the default parameter values.

@@ -1522,6 +1522,7 @@ class RawInstructions : public RawObject {
   // Instructions size in bytes and flags.
   // Currently, only flag indicates 1 or 2 entry points.
   uint32_t size_and_flags_;
+  uint32_t unchecked_entrypoint_pc_offset_;
 
 #if defined(DART_PRECOMPILER)
   // There is a gap between size_and_flags_ and the entry point
@@ -1532,8 +1533,6 @@ class RawInstructions : public RawObject {
   // whether this field is included or excluded.
   CodeStatistics* stats_;
 #endif
-
-  uword unchecked_entrypoint_pc_offset_;
 
   // Variable length data follows here.
   uint8_t* data() { OPEN_ARRAY_START(uint8_t, uint8_t); }
