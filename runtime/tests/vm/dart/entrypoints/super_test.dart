@@ -10,10 +10,9 @@
 import "common.dart";
 import "package:expect/expect.dart";
 
-abstract class C<T> {
+class C<T> {
   @NeverInline
   @pragma("vm:testing.unsafe.trace-entrypoints-fn", validate)
-  @pragma("vm:entry-point")
   void target1(T x) {
     Expect.notEquals(x, -1);
   }
@@ -42,6 +41,8 @@ C getC() {
   } else if (j % 2 == 1) {
     ++j;
     return new E<int>();
+  } else {
+    return new C<int>();
   }
 }
 
