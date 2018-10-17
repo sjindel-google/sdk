@@ -516,6 +516,10 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
   const Fragment default_type_handling =
       BuildDefaultTypeHandling(function, ReaderOffset());
 
+  const ProcedureAttributesMetadata parent_attrs =
+      procedure_attributes_metadata_helper_.GetProcedureAttributes(
+          parent.kernel_offset());
+
   // We're going to throw away the explicit checks because the target will
   // always check them.
   Fragment implicit_checks;
@@ -530,10 +534,8 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
                               nullptr);
     } else {
       // Check if parent function was annotated with no-dynamic-invocations.
-      const ProcedureAttributesMetadata attrs =
-          procedure_attributes_metadata_helper_.GetProcedureAttributes(
-              parent.kernel_offset());
-      if (MethodCanSkipTypeChecksForNonCovariantArguments(parent, attrs)) {
+      if (MethodCanSkipTypeChecksForNonCovariantArguments(parent,
+                                                          parent_attrs)) {
         // If it was then we might need to build some checks in the
         // tear-off.
         AlternativeReadingScope _(&reader_);
@@ -610,7 +612,10 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
 
   // Setup multiple entrypoints if useful.
   FunctionEntryInstr* extra_entry = nullptr;
-  if (function.MayHaveUncheckedEntryPoint(I)) {
+  // TODO(#34162): We can still skip the non-generic-covariant parameter checks
+  // when the target has only 'this' uses.
+  if (function.MayHaveUncheckedEntryPoint(I) &&
+      parent_attrs.has_non_this_uses) {
     // The prologue for a closure will always have context handling (e.g.
     // setting up the 'this_variable'), but we don't need it on the unchecked
     // entry because the only time we reference this is for loading the
