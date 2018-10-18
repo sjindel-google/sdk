@@ -3028,9 +3028,11 @@ Fragment StreamingFlowGraphBuilder::BuildPropertySet(TokenPosition* p) {
       direct_call_metadata_helper_.GetDirectTargetForPropertySet(offset);
   const CallSiteAttributesMetadata call_site_attributes =
       call_site_attributes_metadata_helper_.GetCallSiteAttributes(offset);
+  const InferredTypeMetadata inferred_type =
+      inferred_type_metadata_helper_.GetInferredType(offset);
 
   // True if callee can skip argument type checks.
-  bool is_unchecked_call = false;
+  bool is_unchecked_call = inferred_type.IsSkipCheck();
 #ifndef TARGET_ARCH_DBC
   if (call_site_attributes.receiver_type != nullptr &&
       call_site_attributes.receiver_type->HasTypeClass() &&
@@ -3523,7 +3525,7 @@ Fragment StreamingFlowGraphBuilder::BuildMethodInvocation(TokenPosition* p) {
   const Tag receiver_tag = PeekTag();  // peek tag for receiver.
 
   bool is_unchecked_closure_call = false;
-  bool is_unchecked_call = false;
+  bool is_unchecked_call = result_type.IsSkipCheck();
 #ifndef TARGET_ARCH_DBC
   if (call_site_attributes.receiver_type != nullptr) {
     if (call_site_attributes.receiver_type->IsFunctionType()) {

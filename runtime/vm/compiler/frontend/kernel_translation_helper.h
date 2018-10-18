@@ -843,6 +843,7 @@ struct InferredTypeMetadata {
   enum Flag {
     kFlagNullable = 1 << 0,
     kFlagInt = 1 << 1,
+    kFlagSkipCheck = 1 << 2,
   };
 
   InferredTypeMetadata(intptr_t cid_, uint8_t flags_)
@@ -856,6 +857,7 @@ struct InferredTypeMetadata {
   }
   bool IsNullable() const { return (flags & kFlagNullable) != 0; }
   bool IsInt() const { return (flags & kFlagInt) != 0; }
+  bool IsSkipCheck() const { return (flags & kFlagSkipCheck) != 0; }
 
   CompileType ToCompileType(Zone* zone) const {
     if (IsInt()) {
