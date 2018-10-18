@@ -10,5 +10,5 @@ class A extends core::Object {
 static method foo() → core::Object
   return new self::A::•();
 static method main(core::List<core::String> args) → dynamic {
-  core::print([@vm.inferred-type.metadata=#lib::A] self::foo());
+  core::print([@vm.inferred-type.metadata=#lib::A (skip check)] self::foo());
 }
