@@ -16,6 +16,7 @@ import 'utils.dart';
 abstract class CallHandler {
   Type applyCall(Call callSite, Selector selector, Args<Type> args,
       {bool isResultUsed});
+  void typeCheckTriggered();
 }
 
 /// Base class for all statements in a summary.
@@ -168,7 +169,13 @@ class Call extends Statement {
   final Selector selector;
   final Args<TypeExpr> args;
 
-  Call(this.selector, this.args);
+  Call(this.selector, this.args) {
+    // TODO(sjindel/tfa): Support inferring unchecked entry-points for dynamic
+    // and direct calls as well.
+    if (selector is DynamicSelector || selector is DirectSelector) {
+      setChecked();
+    }
+  }
 
   @override
   void accept(StatementVisitor visitor) => visitor.visitCall(this);
@@ -212,6 +219,7 @@ class Call extends Statement {
   static const int kNullableReceiver = (1 << 2);
   static const int kResultUsed = (1 << 3);
   static const int kReachable = (1 << 4);
+  static const int kChecked = (1 << 5);
 
   Member _monomorphicTarget;
 
@@ -227,7 +235,13 @@ class Call extends Statement {
 
   bool get isReachable => (_flags & kReachable) != 0;
 
+  bool get isChecked => (_flags & kChecked) != 0;
+
   Type get resultType => _resultType;
+
+  void setChecked() {
+    _flags |= kChecked;
+  }
 
   void setResultUsed() {
     _flags |= kResultUsed;
@@ -391,13 +405,6 @@ class TypeCheck extends Statement {
   TypeExpr arg;
   TypeExpr type;
 
-  bool _canSkip = true;
-
-  // True if a the runtime type-check for this parameter can be skipped on
-  // statically-typed call-sites. (The type-check is only simulated after
-  // narrowing by the static parameter type.)
-  bool get canSkipOnStaticCallSite => _canSkip;
-
   final VariableDeclaration parameter;
 
   TypeCheck(this.arg, this.type, this.parameter);
@@ -421,25 +428,29 @@ class TypeCheck extends Statement {
     Type checkType = type.getComputedType(computedTypes);
     // TODO(sjindel/tfa): Narrow the result if possible.
     assertx(checkType is AnyType || checkType is RuntimeType);
-    if (_canSkip) {
-      if (checkType is AnyType) {
-        // If we don't know what the RHS of the check is going to be, we can't
-        // guarantee that it will pass.
+
+    if (checkType is AnyType) {
+      // If we don't know what the RHS of the check is going to be, we can't
+      // guarantee that it will pass.
+      callHandler.typeCheckTriggered();
+      if (kPrintTrace) {
+        tracePrint("TypeCheck failed, type is unknown");
+      }
+    } else if (checkType is RuntimeType) {
+      final bool canSkip =
+          argType.isSubtypeOfRuntimeType(typeHierarchy, checkType);
+      if (!canSkip) {
+        callHandler.typeCheckTriggered();
         if (kPrintTrace) {
-          tracePrint("TypeCheck failed, type is unknown");
-        }
-        _canSkip = false;
-      } else if (checkType is RuntimeType) {
-        _canSkip = argType.isSubtypeOfRuntimeType(typeHierarchy, checkType);
-        if (kPrintTrace && !_canSkip) {
           tracePrint("TypeCheck of $argType against $checkType failed.");
         }
-        argType = argType.intersection(
-            Type.fromStatic(checkType.representedTypeRaw), typeHierarchy);
-      } else {
-        assertx(false, details: "Cannot see $checkType on RHS of TypeCheck.");
       }
+      argType = argType.intersection(
+          Type.fromStatic(checkType.representedTypeRaw), typeHierarchy);
+    } else {
+      assertx(false, details: "Cannot see $checkType on RHS of TypeCheck.");
     }
+
     return argType;
   }
 }
@@ -568,16 +579,5 @@ class Summary {
       }
     }
     return new Args<Type>(argTypes, names: argNames);
-  }
-
-  List<VariableDeclaration> get staticCallSiteSkipCheckParams {
-    final vars = <VariableDeclaration>[];
-    for (final statement in _statements) {
-      if (statement is TypeCheck && statement.canSkipOnStaticCallSite) {
-        final decl = statement.parameter;
-        if (decl != null) vars.add(decl);
-      }
-    }
-    return vars;
   }
 }

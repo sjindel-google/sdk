@@ -167,7 +167,6 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
   }
 
   void _setInferredType(TreeNode node, Type type, {bool skipCheck: false}) {
-    assertx(skipCheck == false || node is VariableDeclaration || node is Field);
     final inferredType = _convertType(type, skipCheck: skipCheck);
     if (inferredType != null) {
       _inferredTypeMetadata.mapping[node] = inferredType;
@@ -182,8 +181,10 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
     final callSite = _typeFlowAnalysis.callSite(node);
     if (callSite != null) {
       if (callSite.isReachable) {
-        if (callSite.isResultUsed) {
-          _setInferredType(node, callSite.resultType);
+        bool markSkipCheck = !callSite.isChecked &&
+            (node is MethodInvocation || node is PropertySet);
+        if (callSite.isResultUsed || markSkipCheck) {
+          _setInferredType(node, callSite.resultType, skipCheck: true);
         }
       } else {
         _setUnreachable(node);
@@ -194,14 +195,10 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
   void _annotateMember(Member member) {
     if (_typeFlowAnalysis.isMemberUsed(member)) {
       if (member is Field) {
-        _setInferredType(member, _typeFlowAnalysis.fieldType(member),
-            skipCheck: _typeFlowAnalysis.fieldStaticCallSiteSkipCheck(member));
+        _setInferredType(member, _typeFlowAnalysis.fieldType(member));
       } else {
         Args<Type> argTypes = _typeFlowAnalysis.argumentTypes(member);
         assertx(argTypes != null);
-
-        final skipCheckParams = new Set<VariableDeclaration>.from(
-            _typeFlowAnalysis.staticCallSiteSkipCheckParams(member));
 
         final int firstParamIndex =
             numTypeParams(member) + (hasReceiverArg(member) ? 1 : 0);
@@ -212,8 +209,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
 
         for (int i = 0; i < positionalParams.length; i++) {
           _setInferredType(
-              positionalParams[i], argTypes.values[firstParamIndex + i],
-              skipCheck: skipCheckParams.contains(positionalParams[i]));
+              positionalParams[i], argTypes.values[firstParamIndex + i]);
         }
 
         // TODO(dartbug.com/32292): make sure parameters are sorted in kernel
@@ -223,8 +219,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
           final param = findNamedParameter(member.function, names[i]);
           assertx(param != null);
           _setInferredType(param,
-              argTypes.values[firstParamIndex + positionalParams.length + i],
-              skipCheck: skipCheckParams.contains(param));
+              argTypes.values[firstParamIndex + positionalParams.length + i]);
         }
 
         // TODO(alexmarkov): figure out how to pass receiver type.

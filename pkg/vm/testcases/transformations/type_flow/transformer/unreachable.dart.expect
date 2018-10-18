@@ -18,5 +18,5 @@ static method bar([@vm.inferred-type.metadata=#lib::B?] self::I i) → void {
   }
 }
 static method main(core::List<core::String> args) → dynamic {
-  self::bar([@vm.inferred-type.metadata=#lib::B?] self::ii);
+  self::bar([@vm.inferred-type.metadata=#lib::B? (skip check)] self::ii);
 }
