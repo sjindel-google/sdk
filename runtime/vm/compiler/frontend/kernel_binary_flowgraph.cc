@@ -3328,7 +3328,7 @@ Fragment StreamingFlowGraphBuilder::BuildSuperPropertySet(TokenPosition* p) {
         position, Function::ZoneHandle(Z, function.raw()),
         /* argument_count = */ 2, Array::null_array(), ICData::kSuper,
         /*result_type=*/nullptr, /*type_args_len=*/0,
-        /*use_unchecked_entry=*/!FLAG_precompiled_mode);
+        /*use_unchecked_entry=*/true);
     instructions += Drop();  // Drop result of the setter invocation.
   }
 
@@ -3925,7 +3925,7 @@ Fragment StreamingFlowGraphBuilder::BuildSuperMethodInvocation(
            StaticCall(position, Function::ZoneHandle(Z, function.raw()),
                       argument_count, argument_names, ICData::kSuper,
                       &result_type, type_args_len,
-                      /*use_unchecked_entry_point=*/!FLAG_precompiled_mode);
+                      /*use_unchecked_entry_point=*/true);
   }
 }
 
