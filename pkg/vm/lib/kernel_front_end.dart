@@ -145,17 +145,15 @@ Future _runGlobalTransformations(
     devirtualization.transformComponent(coreTypes, component);
     no_dynamic_invocations_annotator.transformComponent(component);
   }
-<<<<<<< master
 
-  // We don't know yet whether gen_snapshot will want to do obfuscation, but if
-  // it does it will need the obfuscation prohibitions.
-  obfuscationProhibitions.transformComponent(component, coreTypes);
-=======
   void ignoreAmbiguousSupertypes(cls, a, b) {}
   final hierarchy = new ClassHierarchy(component,
       onAmbiguousSupertypes: ignoreAmbiguousSupertypes);
   CSA.transformLibraries(component, component.libraries, coreTypes, hierarchy);
->>>>>>> HEAD~3
+
+  // We don't know yet whether gen_snapshot will want to do obfuscation, but if
+  // it does it will need the obfuscation prohibitions.
+  obfuscationProhibitions.transformComponent(component, coreTypes);
 }
 
 /// Runs given [action] with [CompilerContext]. This is needed to
