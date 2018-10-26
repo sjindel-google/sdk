@@ -65,8 +65,6 @@ class StatementVisitor {
 /// Input parameter of the summary.
 class Parameter extends Statement {
   final String name;
-
-  // 'staticType' is null for type parameters to factory constructors.
   final Type staticType;
 
   Type defaultValue;
@@ -512,10 +510,14 @@ class Summary {
 
     for (int i = 0; i < positionalArgCount; i++) {
       final Parameter param = _statements[i] as Parameter;
+      if (args[i] is RuntimeType) {
+        types[i] = args[i];
+        continue;
+      }
+      // TODO(sjindel/tfa): Perform narrowing inside 'TypeCheck'.
+      final argType = args[i].specialize(typeHierarchy);
+      param._observeArgumentType(argType, typeHierarchy);
       if (param.staticType != null) {
-        final argType = args[i].specialize(typeHierarchy);
-        param._observeArgumentType(argType, typeHierarchy);
-        // TODO(sjindel/tfa): Perform narrowing inside 'TypeCheck'.
         types[i] = argType.intersection(param.staticType, typeHierarchy);
       } else {
         types[i] = args[i];
@@ -524,7 +526,6 @@ class Summary {
 
     for (int i = positionalArgCount; i < positionalParameterCount; i++) {
       final Parameter param = _statements[i] as Parameter;
-      assertx(param.staticType != null);
       final argType = param.defaultValue.specialize(typeHierarchy);
       param._observeArgumentType(argType, typeHierarchy);
       types[i] = argType;
@@ -540,7 +541,11 @@ class Summary {
             args[positionalArgCount + argIndex].specialize(typeHierarchy);
         argIndex++;
         param._observeArgumentType(argType, typeHierarchy);
-        types[i] = argType.intersection(param.staticType, typeHierarchy);
+        if (param.staticType != null) {
+          types[i] = argType.intersection(param.staticType, typeHierarchy);
+        } else {
+          types[i] = argType;
+        }
       } else {
         assertx((argIndex == namedArgCount) ||
             (param.name.compareTo(argNames[argIndex]) < 0));
