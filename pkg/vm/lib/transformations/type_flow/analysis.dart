@@ -222,9 +222,13 @@ class _DirectInvocation extends _Invocation {
     final Member member = selector.member;
     if (selector.memberAgreesToCallKind(member)) {
       if (_argumentsValid()) {
-        return typeFlowAnalysis
+        final result = typeFlowAnalysis
             .getSummary(member)
             .apply(args, typeFlowAnalysis.hierarchyCache, typeFlowAnalysis);
+        if (!typeChecksNeeded) {
+          typeChecksNeeded = !member.function.typeParameters.isEmpty;
+        }
+        return result;
       } else {
         assertx(selector.callKind == CallKind.Method);
         return _processNoSuchMethod(args.receiver, typeFlowAnalysis);
