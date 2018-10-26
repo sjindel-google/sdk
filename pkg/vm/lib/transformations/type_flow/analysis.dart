@@ -1041,8 +1041,16 @@ class _ClassHierarchyCache implements TypeHierarchy {
       return true;
     }
 
-    if (superType is DynamicType || superType is VoidType) return true;
-    if (subType is DynamicType || subType is VoidType) return false;
+    if (superType is DynamicType ||
+        superType is VoidType ||
+        subType is BottomType) {
+      return true;
+    }
+    if (subType is DynamicType ||
+        subType is VoidType ||
+        superType is BottomType) {
+      return false;
+    }
 
     // TODO(alexmarkov): handle function types properly
     if (subType is FunctionType) {
