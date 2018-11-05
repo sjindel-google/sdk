@@ -158,7 +158,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
           .toList();
     }
 
-    if ((concreteClass != null) || !nullable || isInt) {
+    if ((concreteClass != null) || !nullable || isInt || skipCheck) {
       return new InferredType(concreteClass, nullable, isInt,
           exactTypeArguments: typeArgs, skipCheck: skipCheck);
     }

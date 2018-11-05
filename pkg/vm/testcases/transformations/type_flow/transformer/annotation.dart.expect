@@ -42,6 +42,6 @@ static method foo([@vm.inferred-type.metadata=dart.core::Null?] (core::List<core
 @self::ParametrizedAnnotation::•<core::Null>(null)
 static method main(core::List<core::String> args) → dynamic {
   self::A::staticMethod();
-  [@vm.direct-call.metadata=#lib::B::instanceMethod] new self::B::•().{self::B::instanceMethod}();
+  [@vm.direct-call.metadata=#lib::B::instanceMethod] [@vm.inferred-type.metadata=!? (skip check)] new self::B::•().{self::B::instanceMethod}();
   self::foo(null);
 }
