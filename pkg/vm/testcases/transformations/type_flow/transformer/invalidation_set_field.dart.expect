@@ -30,7 +30,7 @@ class DeepCaller1 extends core::Object {
 [@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:false,hasTearOffUses:false]  method barL3([@vm.inferred-type.metadata=#lib::A?] self::A aa) → dynamic
     return [@vm.direct-call.metadata=#lib::DeepCaller1::barL4] [@vm.inferred-type.metadata=#lib::T1 (skip check)] this.{self::DeepCaller1::barL4}(aa);
 [@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:false,hasTearOffUses:false]  method barL4([@vm.inferred-type.metadata=#lib::A?] self::A aa) → dynamic
-    return [@vm.direct-call.metadata=#lib::A::field1??] [@vm.inferred-type.metadata=#lib::T1 (skip check)] aa.{self::A::field1};
+    return [@vm.direct-call.metadata=#lib::A::field1??] [@vm.inferred-type.metadata=#lib::T1] aa.{self::A::field1};
 }
 class DeepCaller2 extends core::Object {
   synthetic constructor •() → self::DeepCaller2
@@ -43,7 +43,7 @@ class DeepCaller2 extends core::Object {
 [@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:false,hasTearOffUses:false]  method barL3([@vm.inferred-type.metadata=#lib::A?] self::A aa) → dynamic
     return [@vm.direct-call.metadata=#lib::DeepCaller2::barL4] [@vm.inferred-type.metadata=! (skip check)] this.{self::DeepCaller2::barL4}(aa);
 [@vm.procedure-attributes.metadata=hasDynamicUses:false,hasNonThisUses:false,hasTearOffUses:false]  method barL4([@vm.inferred-type.metadata=#lib::A?] self::A aa) → dynamic
-    return [@vm.direct-call.metadata=#lib::A::field2??] [@vm.inferred-type.metadata=! (skip check)] aa.{self::A::field2};
+    return [@vm.direct-call.metadata=#lib::A::field2??] [@vm.inferred-type.metadata=!] aa.{self::A::field2};
 }
 [@vm.inferred-type.metadata=dart.core::Null?]static field core::Function unknown;
 static method use1([@vm.inferred-type.metadata=#lib::DeepCaller1] self::DeepCaller1 x, [@vm.inferred-type.metadata=#lib::A?] self::A aa) → dynamic
