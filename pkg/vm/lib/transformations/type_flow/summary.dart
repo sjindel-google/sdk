@@ -449,6 +449,11 @@ class TypeCheck extends Statement {
       assertx(false, details: "Cannot see $checkType on RHS of TypeCheck.");
     }
 
+    if (parameter != null) {
+      argType =
+          argType.intersection(Type.fromStatic(parameter.type), typeHierarchy);
+    }
+
     return argType;
   }
 }
