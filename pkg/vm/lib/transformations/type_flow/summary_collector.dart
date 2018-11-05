@@ -18,7 +18,6 @@ import 'native_code.dart';
 import 'summary.dart';
 import 'types.dart';
 import 'utils.dart';
-import 'dart:developer';
 
 /// Summary collector relies on either full or partial mixin resolution.
 /// Currently VmTarget.performModularTransformationsOnLibraries performs
