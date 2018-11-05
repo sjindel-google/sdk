@@ -14,8 +14,8 @@ t1 = _Call direct [dart.core::Object::] (%this)
 RESULT: _T {}?
 ------------ #lib::_NotRealHashMap::setEntry ------------
 %this = _Parameter #0 [_T (#lib::_NotRealHashMap<dynamic, dynamic>)+]
-%key = _Parameter #1 [_T (dart.core::Object)+?]
-%value = _Parameter #2 [_T (dart.core::Object)+?]
+%key = _Parameter #1 [null]
+%value = _Parameter #2 [null]
 t3 = _Extract (%this[#lib::_NotRealHashMap/0])
 t4 = _TypeCheck (%key against t3) (for parameter key)
 t5 = _Extract (%this[#lib::_NotRealHashMap/1])
