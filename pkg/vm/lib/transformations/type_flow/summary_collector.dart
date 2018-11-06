@@ -304,7 +304,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
   Summary createSummary(Member member,
       {fieldSummaryType: FieldSummaryType.kInitializer}) {
-    // if ('$member'.contains('_removeEntry')) debugger();
     debugPrint("===== ${member} =====");
     assertx(!member.isAbstract);
 
@@ -377,6 +376,8 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       _translator = new RuntimeTypeTranslator(
           _summary, _receiver, _fnTypeVariables, _genericInterfacesInfo);
 
+      // Handle forwarding stubs. We need to check types against the types of
+      // the forwarding stub's target, [member.forwardingStubSuperTarget].
       FunctionNode useTypesFrom = member.function;
       if (member is Procedure &&
           member.isForwardingStub &&

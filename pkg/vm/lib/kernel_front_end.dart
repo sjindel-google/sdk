@@ -146,6 +146,7 @@ Future _runGlobalTransformations(
     no_dynamic_invocations_annotator.transformComponent(component);
   }
 
+  // TODO(35069): avoid recomputing CSA by reading it from the platform files.
   void ignoreAmbiguousSupertypes(cls, a, b) {}
   final hierarchy = new ClassHierarchy(component,
       onAmbiguousSupertypes: ignoreAmbiguousSupertypes);

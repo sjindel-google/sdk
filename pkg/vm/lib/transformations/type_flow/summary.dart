@@ -65,6 +65,10 @@ class StatementVisitor {
 /// Input parameter of the summary.
 class Parameter extends Statement {
   final String name;
+
+  // [staticType] is null if no narrowing should be performed. This happens for
+  // type parameters and for parameters whose type is narrowed by a [TypeCheck]
+  // statement.
   final Type staticType;
 
   Type defaultValue;
@@ -519,12 +523,12 @@ class Summary {
         types[i] = args[i];
         continue;
       }
-      // TODO(sjindel/tfa): Perform narrowing inside 'TypeCheck'.
       final argType = args[i].specialize(typeHierarchy);
       param._observeArgumentType(argType, typeHierarchy);
       if (param.staticType != null) {
         types[i] = argType.intersection(param.staticType, typeHierarchy);
       } else {
+        // TODO(sjindel/tfa): Narrowing is performed inside a [TypeCheck] later.
         types[i] = args[i];
       }
     }

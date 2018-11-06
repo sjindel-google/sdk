@@ -226,6 +226,11 @@ class _DirectInvocation extends _Invocation {
             .getSummary(member)
             .apply(args, typeFlowAnalysis.hierarchyCache, typeFlowAnalysis);
         if (!typeChecksNeeded) {
+          // We don't emit [TypeCheck] statements for bounds checks of type
+          // parameters, so if there are any type parameters, we must assume
+          // they could fail bounds checks.
+          //
+          // TODO(sjindel): Use [TypeCheck] to avoid bounds checks.
           typeChecksNeeded = !member.function.typeParameters.isEmpty;
         }
         return result;
@@ -1447,6 +1452,11 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
     }
   }
 
+  @override
+  void typeCheckTriggered() {
+    currentInvocation.typeChecksNeeded = true;
+  }
+
   /// ---- Implementation of [EntryPointsListener] interface. ----
 
   @override
@@ -1487,10 +1497,5 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
   @override
   void recordMemberCalledViaThis(Member target) {
     _calledViaThis.add(target);
-  }
-
-  @override
-  void typeCheckTriggered() {
-    currentInvocation.typeChecksNeeded = true;
   }
 }

@@ -188,10 +188,10 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
         } else if (markSkipCheck) {
           // If the call is not marked as 'isResultUsed', the 'resultType' will
           // not be observed (i.e., it will always be EmptyType). This is the
-          // case even when the result is acutally might be used but is not used
-          // by the summary, e.g. if the result is an argument to a closure
-          // call. Therefore, we need to pass in 'NullableType(AnyType)' as the
-          // inferred result type here (since we don't know what is actually
+          // case even if the result acutally might be used but is not used by
+          // the summary, e.g. if the result is an argument to a closure call.
+          // Therefore, we need to pass in 'NullableType(AnyType)' as the
+          // inferred result type here (since we don't know what it actually
           // is).
           _setInferredType(node, NullableType(const AnyType()),
               skipCheck: true);
