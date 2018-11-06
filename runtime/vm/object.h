@@ -4308,7 +4308,6 @@ class Instructions : public Object {
     return SizeBits::decode(instr->ptr()->size_and_flags_);
   }
 
-  // SAMIR_TODO: rename this confusing function
   bool HasSingleEntryPoint() const {
     return FlagsBits::decode(raw_ptr()->size_and_flags_);
   }
