@@ -181,7 +181,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
     final callSite = _typeFlowAnalysis.callSite(node);
     if (callSite != null) {
       if (callSite.isReachable) {
-        bool markSkipCheck = !callSite.isChecked &&
+        bool markSkipCheck = !callSite.useCheckedEntry &&
             (node is MethodInvocation || node is PropertySet);
         if (callSite.isResultUsed) {
           _setInferredType(node, callSite.resultType, skipCheck: markSkipCheck);

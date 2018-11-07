@@ -90,7 +90,7 @@ abstract class _Invocation extends _DependencyTracker
   /// Number of times result of this invocation was invalidated.
   int invalidationCounter = 0;
 
-  bool typeChecksNeeded;
+  bool typeChecksNeeded = false;
 
   /// If an invocation is invalidated more than [invalidationLimit] times,
   /// its result is saturated in order to guarantee convergence.
@@ -145,10 +145,16 @@ abstract class _Invocation extends _DependencyTracker
 
 class _DirectInvocation extends _Invocation {
   _DirectInvocation(DirectSelector selector, Args<Type> args)
-      : super(selector, args);
-
-  @override
-  bool typeChecksNeeded = false;
+      : super(selector, args) {
+    // We don't emit [TypeCheck] statements for bounds checks of type
+    // parameters, so if there are any type parameters, we must assume
+    // they could fail bounds checks.
+    //
+    // TODO(sjindel): Use [TypeCheck] to avoid bounds checks.
+    if (selector.member.function != null) {
+      typeChecksNeeded = !selector.member.function.typeParameters.isEmpty;
+    }
+  }
 
   @override
   Type process(TypeFlowAnalysis typeFlowAnalysis) {
@@ -222,18 +228,9 @@ class _DirectInvocation extends _Invocation {
     final Member member = selector.member;
     if (selector.memberAgreesToCallKind(member)) {
       if (_argumentsValid()) {
-        final result = typeFlowAnalysis
+        return typeFlowAnalysis
             .getSummary(member)
             .apply(args, typeFlowAnalysis.hierarchyCache, typeFlowAnalysis);
-        if (!typeChecksNeeded) {
-          // We don't emit [TypeCheck] statements for bounds checks of type
-          // parameters, so if there are any type parameters, we must assume
-          // they could fail bounds checks.
-          //
-          // TODO(sjindel): Use [TypeCheck] to avoid bounds checks.
-          typeChecksNeeded = !member.function.typeParameters.isEmpty;
-        }
-        return result;
       } else {
         assertx(selector.callKind == CallKind.Method);
         return _processNoSuchMethod(args.receiver, typeFlowAnalysis);
@@ -298,18 +295,17 @@ class _DirectInvocation extends _Invocation {
 
 class _DispatchableInvocation extends _Invocation {
   bool _isPolymorphic = false;
-  bool _typeChecksNeeded = false;
   Set<Call> _callSites;
   Member _monomorphicTarget;
 
   @override
-  bool get typeChecksNeeded => _typeChecksNeeded;
+  bool get typeChecksNeeded => super.typeChecksNeeded;
 
   @override
   set typeChecksNeeded(bool value) {
-    if (_typeChecksNeeded) return;
+    if (super.typeChecksNeeded) return;
     if (value) {
-      _typeChecksNeeded = true;
+      super.typeChecksNeeded = true;
       _notifyCallSites();
     }
   }
@@ -356,6 +352,8 @@ class _DispatchableInvocation extends _Invocation {
         Type type;
 
         if (target == kNoSuchMethodMarker) {
+          // Non-dynamic call-sites must hit NSM-forwarders in Dart 2.
+          assertx(selector is DynamicSelector);
           type = _processNoSuchMethod(receiver, typeFlowAnalysis);
         } else {
           final directSelector =
@@ -582,7 +580,7 @@ class _DispatchableInvocation extends _Invocation {
     }
 
     if (typeChecksNeeded) {
-      callSite.setChecked();
+      callSite.setUseCheckedEntry();
     }
   }
 
