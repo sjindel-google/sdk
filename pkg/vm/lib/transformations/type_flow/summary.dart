@@ -69,12 +69,12 @@ class Parameter extends Statement {
   // [staticType] is null if no narrowing should be performed. This happens for
   // type parameters and for parameters whose type is narrowed by a [TypeCheck]
   // statement.
-  final Type staticType;
+  final Type staticTypeForNarrowing;
 
   Type defaultValue;
   Type _argumentType = const EmptyType();
 
-  Parameter(this.name, this.staticType);
+  Parameter(this.name, this.staticTypeForNarrowing);
 
   @override
   String get label => "%$name";
@@ -83,7 +83,13 @@ class Parameter extends Statement {
   void accept(StatementVisitor visitor) => visitor.visitParameter(this);
 
   @override
-  String dump() => "$label = _Parameter #$index [$staticType]";
+  String dump() {
+    String text = "$label = _Parameter #$index";
+    if (staticTypeForNarrowing != null) {
+      text += " [$staticTypeForNarrowing]";
+    }
+    return text;
+  }
 
   @override
   Type apply(List<Type> computedTypes, TypeHierarchy typeHierarchy,
@@ -175,7 +181,7 @@ class Call extends Statement {
     // TODO(sjindel/tfa): Support inferring unchecked entry-points for dynamic
     // and direct calls as well.
     if (selector is DynamicSelector || selector is DirectSelector) {
-      setChecked();
+      setUseCheckedEntry();
     }
   }
 
@@ -221,7 +227,7 @@ class Call extends Statement {
   static const int kNullableReceiver = (1 << 2);
   static const int kResultUsed = (1 << 3);
   static const int kReachable = (1 << 4);
-  static const int kChecked = (1 << 5);
+  static const int kUseCheckedEntry = (1 << 5);
 
   Member _monomorphicTarget;
 
@@ -237,12 +243,12 @@ class Call extends Statement {
 
   bool get isReachable => (_flags & kReachable) != 0;
 
-  bool get isChecked => (_flags & kChecked) != 0;
+  bool get useCheckedEntry => (_flags & kUseCheckedEntry) != 0;
 
   Type get resultType => _resultType;
 
-  void setChecked() {
-    _flags |= kChecked;
+  void setUseCheckedEntry() {
+    _flags |= kUseCheckedEntry;
   }
 
   void setResultUsed() {
@@ -525,8 +531,9 @@ class Summary {
       }
       final argType = args[i].specialize(typeHierarchy);
       param._observeArgumentType(argType, typeHierarchy);
-      if (param.staticType != null) {
-        types[i] = argType.intersection(param.staticType, typeHierarchy);
+      if (param.staticTypeForNarrowing != null) {
+        types[i] =
+            argType.intersection(param.staticTypeForNarrowing, typeHierarchy);
       } else {
         // TODO(sjindel/tfa): Narrowing is performed inside a [TypeCheck] later.
         types[i] = args[i];
@@ -550,8 +557,9 @@ class Summary {
             args[positionalArgCount + argIndex].specialize(typeHierarchy);
         argIndex++;
         param._observeArgumentType(argType, typeHierarchy);
-        if (param.staticType != null) {
-          types[i] = argType.intersection(param.staticType, typeHierarchy);
+        if (param.staticTypeForNarrowing != null) {
+          types[i] =
+              argType.intersection(param.staticTypeForNarrowing, typeHierarchy);
         } else {
           types[i] = argType;
         }
