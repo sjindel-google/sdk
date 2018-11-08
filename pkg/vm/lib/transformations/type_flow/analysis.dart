@@ -299,11 +299,8 @@ class _DispatchableInvocation extends _Invocation {
   Member _monomorphicTarget;
 
   @override
-  bool get typeChecksNeeded => super.typeChecksNeeded;
-
-  @override
   set typeChecksNeeded(bool value) {
-    if (super.typeChecksNeeded) return;
+    if (typeChecksNeeded) return;
     if (value) {
       super.typeChecksNeeded = true;
       _notifyCallSites();
