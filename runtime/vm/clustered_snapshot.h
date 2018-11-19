@@ -126,6 +126,27 @@ class SmiObjectIdPairTrait {
 
 typedef DirectChainedHashMap<SmiObjectIdPairTrait> SmiObjectIdMap;
 
+template<typename T>
+class HasToSnapshot
+{
+    struct Fallback { int to_snapshot; }; // add member name "to_snapshot"
+    struct Derived : T, Fallback { };
+
+    template<typename U, U> struct Check;
+
+    template<typename U>
+    static constexpr int func(Check<int Fallback::*, &U::to_snapshot> *) {
+      return 0;
+    }
+
+    template<typename U>
+    static constexpr int func(...) { return 1; }
+
+  public:
+    typedef HasToSnapshot type;
+    enum { value = func<Derived>(0) == 1 };
+};
+
 class Serializer : public StackResource {
  public:
   Serializer(Thread* thread,
@@ -284,6 +305,30 @@ class Serializer : public StackResource {
     }
   }
 
+  // Use [to_snapshot()] to get the end pointer if the class has a to_snapshot
+  // method. Otherwise just use [to()].
+
+  template <typename T>
+  typename std::enable_if<HasToSnapshot<T>::value>::type
+  WriteFromTo(T* obj) {
+    RawObject** from = obj->from();
+    RawObject** to = obj->to_snapshot(kind());
+    for (RawObject** p = from; p <= to; p++) {
+      WriteRef(*p);
+    }
+  }
+
+  template <typename T>
+  typename std::enable_if<!HasToSnapshot<T>::value>::type
+  WriteFromTo(T* obj) {
+    ASSERT(false);
+    RawObject** from = obj->from();
+    RawObject** to = obj->to();
+    for (RawObject** p = from; p <= to; p++) {
+      WriteRef(*p);
+    }
+  }
+
   void WriteRootRef(RawObject* object) {
     WriteRef(object, /* is_root = */ true);
   }
@@ -339,6 +384,18 @@ class Serializer : public StackResource {
   DISALLOW_IMPLICIT_CONSTRUCTORS(Serializer);
 };
 
+#define AutoTraceObject(obj)                                                   \
+  SerializerWritingObjectScope scope_##__COUNTER__(s, name(), obj, nullptr)
+
+#define AutoTraceObjectName(obj, str)                                          \
+  SerializerWritingObjectScope scope_##__COUNTER__(s, name(), obj, str)
+
+#define WriteField(obj, field) s->WriteRef(obj->ptr()->field);
+
+#define WriteFieldValue(field, value) s->WriteRef(value);
+
+#define WriteFromTo(obj) s->WriteFromTo(obj);
+
 struct SerializerWritingObjectScope {
   SerializerWritingObjectScope(Serializer* serializer,
                                const char* type,
@@ -353,12 +410,6 @@ struct SerializerWritingObjectScope {
  private:
   Serializer* serializer_;
 };
-
-#define AutoTraceObject(obj)                                                   \
-  SerializerWritingObjectScope scope_##__COUNTER__(s, name(), obj, nullptr)
-
-#define AutoTraceObjectName(obj, str)                                          \
-  SerializerWritingObjectScope scope_##__COUNTER__(s, name(), obj, str)
 
 class Deserializer : public StackResource {
  public:
