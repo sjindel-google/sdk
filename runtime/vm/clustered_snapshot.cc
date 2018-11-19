@@ -465,14 +465,14 @@ class FunctionSerializationCluster : public SerializationCluster {
       AutoTraceObjectName(func, func->ptr()->name_);
       WriteFromTo(func);
       if (kind == Snapshot::kFull) {
-        NOT_IN_PRECOMPILED(s->WriteRef(func->ptr()->bytecode_));
+        NOT_IN_PRECOMPILED(WriteField(func, bytecode_));
       } else if (kind == Snapshot::kFullAOT) {
-        s->WriteRef(func->ptr()->code_);
+        WriteField(func, code_);
       } else if (s->kind() == Snapshot::kFullJIT) {
-        NOT_IN_PRECOMPILED(s->WriteRef(func->ptr()->unoptimized_code_));
-        NOT_IN_PRECOMPILED(s->WriteRef(func->ptr()->bytecode_));
-        s->WriteRef(func->ptr()->code_);
-        s->WriteRef(func->ptr()->ic_data_array_);
+        NOT_IN_PRECOMPILED(WriteField(func, unoptimized_code_));
+        NOT_IN_PRECOMPILED(WriteField(func, bytecode_));
+        WriteField(func, code_);
+        WriteField(func, ic_data_array_);
       }
 
 #if !defined(DART_PRECOMPILED_RUNTIME)
