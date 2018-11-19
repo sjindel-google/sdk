@@ -144,18 +144,13 @@ class ClassSerializationCluster : public SerializationCluster {
 
   void WriteClass(Serializer* s, RawClass* cls) {
     AutoTraceObjectName(cls, cls->ptr()->name_);
-    Snapshot::Kind kind = s->kind();
-    RawObject** from = cls->from();
-    RawObject** to = cls->to_snapshot(kind);
-    for (RawObject** p = from; p <= to; p++) {
-      s->WriteRef(*p);
-    }
+    WriteFromTo(cls);
     intptr_t class_id = cls->ptr()->id_;
     if (class_id == kIllegalCid) {
       s->UnexpectedObject(cls, "Class with illegal cid");
     }
     s->WriteCid(class_id);
-    if (kind != Snapshot::kFullAOT) {
+    if (s->kind() != Snapshot::kFullAOT) {
       s->Write<int32_t>(cls->ptr()->kernel_offset_);
     }
     s->Write<int32_t>(cls->ptr()->instance_size_in_words_);

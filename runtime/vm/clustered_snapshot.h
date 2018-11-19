@@ -257,7 +257,9 @@ class Serializer : public StackResource {
   }
   void Align(intptr_t alignment) { stream_.Align(alignment); }
 
-  void WriteRef(RawObject* object, bool is_root = false) {
+  void WriteRef(RawObject* object,
+                bool is_root = false,
+                const char* field_name = nullptr) {
     intptr_t id = 0;
     if (!object->IsHeapObject()) {
       RawSmi* smi = Smi::RawCast(object);
@@ -318,12 +320,11 @@ class Serializer : public StackResource {
     }
   }
 
-  template <typename T>
+  template <typename T, typename... P>
   typename std::enable_if<!HasToSnapshot<T>::value>::type
-  WriteFromTo(T* obj) {
-    ASSERT(false);
+  WriteFromTo(T* obj, P&&... args) {
     RawObject** from = obj->from();
-    RawObject** to = obj->to();
+    RawObject** to = obj->to(args...);
     for (RawObject** p = from; p <= to; p++) {
       WriteRef(*p);
     }
@@ -394,7 +395,7 @@ class Serializer : public StackResource {
 
 #define WriteFieldValue(field, value) s->WriteRef(value);
 
-#define WriteFromTo(obj) s->WriteFromTo(obj);
+#define WriteFromTo(obj, ...) s->WriteFromTo(obj, ##__VA_ARGS__);
 
 struct SerializerWritingObjectScope {
   SerializerWritingObjectScope(Serializer* serializer,
@@ -468,6 +469,26 @@ class Deserializer : public StackResource {
 
   RawObject* ReadRef() { return Ref(ReadUnsigned()); }
 
+  template <typename T>
+  typename std::enable_if<HasToSnapshot<T>::value>::type
+  ReadFromTo(T* obj) {
+    RawObject** from = obj->from();
+    RawObject** to_snapshot = obj->to_snapshot(kind());
+    for (RawObject** p = from; p <= to_snapshot; p++) {
+      *p = ReadRef();
+    }
+  }
+
+  template <typename T, typename... P>
+  typename std::enable_if<!HasToSnapshot<T>::value>::type
+  ReadFromTo(T* obj, P&&... params) {
+    RawObject** from = obj->from();
+    RawObject** to_snapshot = obj->to(params...);
+    for (RawObject** p = from; p <= to_snapshot; p++) {
+      *p = ReadRef();
+    }
+  }
+
   TokenPosition ReadTokenPosition() {
     return TokenPosition::SnapshotDecode(Read<int32_t>());
   }
@@ -507,6 +528,8 @@ class Deserializer : public StackResource {
   intptr_t next_ref_index_;
   DeserializationCluster** clusters_;
 };
+
+#define ReadFromTo(obj, ...) d->ReadFromTo(obj, ##__VA_ARGS__);
 
 class FullSnapshotWriter {
  public:
