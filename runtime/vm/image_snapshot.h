@@ -184,10 +184,10 @@ class ImageWriter : public ValueObject {
   DISALLOW_COPY_AND_ASSIGN(ImageWriter);
 };
 
-#define AutoTraceImage(section_offset, stream, type)                           \
-  auto AutoTraceImagObjectScopeVar##__COUNTER__ {                              \
-    MakeTraceImageObjectScope(this, section_offset, stream, type)              \
-  }
+#define AutoTraceImage(section_offset, stream, type_name)                      \
+  auto AutoTraceImagObjectScopeVar##__COUNTER__ =                              \
+      TraceImageObjectScope<std::remove_pointer<decltype(stream)>::type>(      \
+          this, section_offset, stream, type_name);
 
 template <typename T>
 class TraceImageObjectScope {
@@ -222,16 +222,6 @@ class TraceImageObjectScope {
   intptr_t section_offset_;
   intptr_t start_offset_;
 };
-
-template <typename U>
-static TraceImageObjectScope<U>&& MakeTraceImageObjectScope(
-    ImageWriter* writer,
-    intptr_t section_offset,
-    U* stream,
-    const char* type) {
-  return std::move(
-      TraceImageObjectScope<U>(writer, section_offset, stream, type));
-}
 
 class AssemblyImageWriter : public ImageWriter {
  public:
