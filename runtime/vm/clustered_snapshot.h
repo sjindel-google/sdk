@@ -126,26 +126,6 @@ class SmiObjectIdPairTrait {
 
 typedef DirectChainedHashMap<SmiObjectIdPairTrait> SmiObjectIdMap;
 
-// Helper class to determine statically if a class has a 'to_snapshot' method.
-template <typename T>
-struct HasToSnapshot {
-  struct F {
-    int to_snapshot;
-  };
-  struct X : T, F {};
-  template <typename U, U>
-  struct C;
-  template <typename U>
-  static constexpr int func(C<int F::*, &U::to_snapshot>*) {
-    return false;
-  }
-  template <typename U>
-  static constexpr int func(...) {
-    return true;
-  }
-  static constexpr bool value = func<X>(0);
-};
-
 class Serializer : public StackResource {
  public:
   Serializer(Thread* thread,
@@ -304,44 +284,19 @@ class Serializer : public StackResource {
     }
   }
 
-  // Use [to_snapshot()] to get the end pointer if the class has a to_snapshot
-  // method. Otherwise just use [to()].
-
-  template <typename T>
-  typename std::enable_if<HasToSnapshot<T>::value>::type WriteFromTo(T* obj) {
+  template <typename T, typename... P>
+  void WriteFromTo(T* obj, P&&... args) {
     RawObject** from = obj->from();
-    RawObject** to = obj->to_snapshot(kind());
+    RawObject** to = obj->to_snapshot(kind(), args...);
     for (RawObject** p = from; p <= to; p++) {
       WriteRef(*p);
     }
   }
 
   template <typename T, typename... P>
-  typename std::enable_if<!HasToSnapshot<T>::value>::type WriteFromTo(
-      T* obj,
-      P&&... args) {
+  void PushFromTo(T* obj, P&&... args) {
     RawObject** from = obj->from();
-    RawObject** to = obj->to(args...);
-    for (RawObject** p = from; p <= to; p++) {
-      WriteRef(*p);
-    }
-  }
-
-  template <typename T>
-  typename std::enable_if<HasToSnapshot<T>::value>::type PushFromTo(T* obj) {
-    RawObject** from = obj->from();
-    RawObject** to = obj->to_snapshot(kind());
-    for (RawObject** p = from; p <= to; p++) {
-      Push(*p);
-    }
-  }
-
-  template <typename T, typename... P>
-  typename std::enable_if<!HasToSnapshot<T>::value>::type PushFromTo(
-      T* obj,
-      P&&... args) {
-    RawObject** from = obj->from();
-    RawObject** to = obj->to(args...);
+    RawObject** to = obj->to_snapshot(kind(), args...);
     for (RawObject** p = from; p <= to; p++) {
       Push(*p);
     }
@@ -413,6 +368,7 @@ class Serializer : public StackResource {
 #define WriteFieldValue(field, value) s->WriteRef(value);
 
 #define WriteFromTo(obj, ...) s->WriteFromTo(obj, ##__VA_ARGS__);
+
 #define PushFromTo(obj, ...) s->PushFromTo(obj, ##__VA_ARGS__);
 
 struct SerializerWritingObjectScope {
@@ -487,27 +443,16 @@ class Deserializer : public StackResource {
 
   RawObject* ReadRef() { return Ref(ReadUnsigned()); }
 
-  template <typename T>
-  typename std::enable_if<HasToSnapshot<T>::value>::type ReadFromTo(T* obj) {
+  template <typename T, typename... P>
+  void ReadFromTo(T* obj, P&&... params) {
     RawObject** from = obj->from();
-    RawObject** to_snapshot = obj->to_snapshot(kind());
-    RawObject** to = obj->to();
+    RawObject** to_snapshot = obj->to_snapshot(kind(), params...);
+    RawObject** to = obj->to(params...);
     for (RawObject** p = from; p <= to_snapshot; p++) {
       *p = ReadRef();
     }
     for (RawObject** p = to_snapshot + 1; p <= to; p++) {
       *p = Object::null();
-    }
-  }
-
-  template <typename T, typename... P>
-  typename std::enable_if<!HasToSnapshot<T>::value>::type ReadFromTo(
-      T* obj,
-      P&&... params) {
-    RawObject** from = obj->from();
-    RawObject** to = obj->to(params...);
-    for (RawObject** p = from; p <= to; p++) {
-      *p = ReadRef();
     }
   }
 
