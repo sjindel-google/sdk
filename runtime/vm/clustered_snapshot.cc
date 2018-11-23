@@ -4191,6 +4191,9 @@ Serializer::Serializer(Thread* thread,
   for (intptr_t i = 0; i < num_cids_; i++) {
     clusters_by_cid_[i] = NULL;
   }
+  if (profile_writer_ != nullptr) {
+    offsets_table_ = new (zone_) OffsetsTable(zone_);
+  }
 }
 
 Serializer::~Serializer() {
@@ -4217,20 +4220,20 @@ void Serializer::TraceStartWritingObject(const char* type,
     name_str = str.ToCString();
   }
 
-  object_currently_writing_id_ = id;
+  object_currently_writing_ = ProfilingObject{
+      obj, id, stream_.Position(), type,
+  };
   profile_writer_->SetObjectTypeAndName(
       {V8SnapshotProfileWriter::kSnapshot, id}, type, name_str);
-  object_currently_writing_start_ = stream_.Position();
 }
 
 void Serializer::TraceEndWritingObject() {
   if (profile_writer_ != nullptr) {
-    ASSERT(object_currently_writing_id_ != 0);
+    ASSERT(object_currently_writing_.id_ != 0);
     profile_writer_->AttributeBytesTo(
-        {V8SnapshotProfileWriter::kSnapshot, object_currently_writing_id_},
-        stream_.Position() - object_currently_writing_start_);
-    object_currently_writing_id_ = 0;
-    object_currently_writing_start_ = 0;
+        {V8SnapshotProfileWriter::kSnapshot, object_currently_writing_.id_},
+        stream_.Position() - object_currently_writing_.stream_start_);
+    object_currently_writing_ = ProfilingObject();
   }
 }
 
@@ -4377,24 +4380,34 @@ void Serializer::WriteInstructions(RawInstructions* instr, RawCode* code) {
   // course, the space taken for the reference is profiled.
   if (profile_writer_ != nullptr && offset >= 0) {
     // Instructions cannot be roots.
-    ASSERT(object_currently_writing_id_ != 0);
+    ASSERT(object_currently_writing_.id_ != 0);
     auto offset_space = vm_ ? V8SnapshotProfileWriter::kVmText
                             : V8SnapshotProfileWriter::kIsolateText;
+    V8SnapshotProfileWriter::ObjectId to_object = {
+        offset_space, offset < 0 ? -offset : offset};
+    V8SnapshotProfileWriter::ObjectId from_object = {
+        V8SnapshotProfileWriter::kSnapshot, object_currently_writing_.id_};
+    // SAMIR_TODO: Get actual offset or name here.
     profile_writer_->AttributeReferenceTo(
-        {V8SnapshotProfileWriter::kSnapshot, object_currently_writing_id_},
-        {offset_space, offset < 0 ? -offset : offset});
+        from_object, {to_object, V8SnapshotProfileWriter::Reference::kProperty,
+                      V8SnapshotProfileWriter::kPropertyString});
   }
 }
 
 void Serializer::TraceDataOffset(uint32_t offset) {
   if (profile_writer_ != nullptr) {
     // ROData cannot be roots.
-    ASSERT(object_currently_writing_id_ != 0);
+    ASSERT(object_currently_writing_.id_ != 0);
     auto offset_space = vm_ ? V8SnapshotProfileWriter::kVmData
                             : V8SnapshotProfileWriter::kIsolateData;
+    V8SnapshotProfileWriter::ObjectId from_object = {
+        V8SnapshotProfileWriter::kSnapshot, object_currently_writing_.id_};
+    V8SnapshotProfileWriter::ObjectId to_object = {offset_space, offset};
+    // SAMIR_TODO: Give this edge a more appropriate type than element
+    // (internal, maybe?).
     profile_writer_->AttributeReferenceTo(
-        {V8SnapshotProfileWriter::kSnapshot, object_currently_writing_id_},
-        {offset_space, offset});
+        from_object,
+        {to_object, V8SnapshotProfileWriter::Reference::kElement, 0});
   }
 }
 

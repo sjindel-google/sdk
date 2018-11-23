@@ -18,6 +18,7 @@
 #include "vm/type_testing_stubs.h"
 #include "vm/v8_snapshot_writer.h"
 #include "vm/version.h"
+#include "vm/raw_object_fields.h"
 
 #if defined(DEBUG)
 #define SNAPSHOT_BACKTRACE
@@ -236,7 +237,45 @@ class Serializer : public StackResource {
   }
   void Align(intptr_t alignment) { stream_.Align(alignment); }
 
-  void WriteRef(RawObject* object, bool is_root = false) {
+  void ProfileReference(bool is_root, intptr_t to_id, intptr_t offset) {
+    if (profile_writer_ == nullptr) return;
+
+    if (is_root) {
+      profile_writer_->AddRoot({V8SnapshotProfileWriter::kSnapshot, to_id});
+      return;
+    }
+
+    ASSERT(object_currently_writing_.id_ != 0);
+
+    V8SnapshotProfileWriter::ObjectId from_object = {
+        V8SnapshotProfileWriter::kSnapshot, object_currently_writing_.id_};
+    V8SnapshotProfileWriter::ObjectId to_object = {V8SnapshotProfileWriter::kSnapshot, to_id};
+
+    if (offset == -1) {
+      // SAMIR_TODO: Remove these cases.
+      profile_writer_->AttributeReferenceTo(
+          from_object,
+          {to_object, V8SnapshotProfileWriter::Reference::kProperty,
+           V8SnapshotProfileWriter::kPropertyString});
+      return;
+    }
+
+    // Try to match the offset with a field name from "raw_object.h".
+    const char* property = offsets_table_->FieldNameForOffset(
+        object_currently_writing_.type_, offset);
+    if (property != nullptr) {
+      profile_writer_->AttributeReferenceTo(
+          from_object,
+          {to_object, V8SnapshotProfileWriter::Reference::kProperty,
+           profile_writer_->EnsureString(property)});
+    } else {
+      profile_writer_->AttributeReferenceTo(
+          from_object,
+          {to_object, V8SnapshotProfileWriter::Reference::kElement, offset});
+    }
+  }
+
+  void WriteRef(RawObject* object, bool is_root = false, intptr_t offset = -1) {
     intptr_t id = 0;
     if (!object->IsHeapObject()) {
       RawSmi* smi = Smi::RawCast(object);
@@ -271,17 +310,7 @@ class Serializer : public StackResource {
     }
 
     WriteUnsigned(id);
-
-    if (profile_writer_ != nullptr) {
-      if (object_currently_writing_id_ != 0) {
-        profile_writer_->AttributeReferenceTo(
-            {V8SnapshotProfileWriter::kSnapshot, object_currently_writing_id_},
-            {V8SnapshotProfileWriter::kSnapshot, id});
-      } else {
-        ASSERT(is_root);
-        profile_writer_->AddRoot({V8SnapshotProfileWriter::kSnapshot, id});
-      }
-    }
+    ProfileReference(is_root, id, offset);
   }
 
   template <typename T, typename... P>
@@ -289,7 +318,8 @@ class Serializer : public StackResource {
     RawObject** from = obj->from();
     RawObject** to = obj->to_snapshot(kind(), args...);
     for (RawObject** p = from; p <= to; p++) {
-      WriteRef(*p);
+      WriteRef(*p, /*is_root=*/false, /*offset=*/
+               (p - reinterpret_cast<RawObject**>(obj->ptr())) * sizeof(RawObject*));
     }
   }
 
@@ -346,8 +376,13 @@ class Serializer : public StackResource {
   bool vm_;
 
   V8SnapshotProfileWriter* profile_writer_ = nullptr;
-  intptr_t object_currently_writing_id_ = 0;
-  intptr_t object_currently_writing_start_ = 0;
+  struct ProfilingObject {
+    RawObject* object_ = nullptr;
+    intptr_t id_ = 0;
+    intptr_t stream_start_ = 0;
+    const char* type_ = nullptr;
+  } object_currently_writing_;
+  OffsetsTable* offsets_table_ = nullptr;
 
 #if defined(SNAPSHOT_BACKTRACE)
   RawObject* current_parent_;
