@@ -4221,12 +4221,10 @@ void Serializer::TraceStartWritingObject(const char* type,
     name_str = str.ToCString();
   }
 
-  object_currently_writing_ = ProfilingObject{
-      obj,
-      id,
-      stream_.Position(),
-      type,
-  };
+  object_currently_writing_.object_ = obj;
+  object_currently_writing_.id_ = id;
+  object_currently_writing_.stream_start_ = stream_.Position();
+  object_currently_writing_.type_ = type;
   profile_writer_->SetObjectTypeAndName(
       {V8SnapshotProfileWriter::kSnapshot, id}, type, name_str);
 }
