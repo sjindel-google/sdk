@@ -299,9 +299,9 @@ class TypeArgumentsSerializationCluster : public SerializationCluster {
       s->Write<bool>(type_args->IsCanonical());
       intptr_t hash = Smi::Value(type_args->ptr()->hash_);
       s->Write<int32_t>(hash);
-      s->WriteRef(type_args->ptr()->instantiations_);
+      WriteField(type_args, instantiations_);
       for (intptr_t j = 0; j < length; j++) {
-        s->WriteRef(type_args->ptr()->types()[j]);
+        s->WriteElementRef(type_args->ptr()->types()[j], j);
       }
     }
   }
@@ -641,11 +641,11 @@ class ClosureDataSerializationCluster : public SerializationCluster {
       RawClosureData* data = objects_[i];
       AutoTraceObject(data);
       if (s->kind() != Snapshot::kFullAOT) {
-        s->WriteRef(data->ptr()->context_scope_);
+        WriteField(data, context_scope_);
       }
-      s->WriteRef(data->ptr()->parent_function_);
-      s->WriteRef(data->ptr()->signature_type_);
-      s->WriteRef(data->ptr()->closure_);
+      WriteField(data, parent_function_);
+      WriteField(data, signature_type_);
+      WriteField(data, closure_);
     }
   }
 
@@ -882,39 +882,39 @@ class FieldSerializationCluster : public SerializationCluster {
     intptr_t count = objects_.length();
     for (intptr_t i = 0; i < count; i++) {
       RawField* field = objects_[i];
-      AutoTraceObject(field);
+      AutoTraceObjectName(field, field->ptr()->name_);
 
-      s->WriteRef(field->ptr()->name_);
-      s->WriteRef(field->ptr()->owner_);
-      s->WriteRef(field->ptr()->type_);
+      WriteField(field, name_);
+      WriteField(field, owner_);
+      WriteField(field, type_);
       // Write out the initial static value or field offset.
       if (Field::StaticBit::decode(field->ptr()->kind_bits_)) {
         if (kind == Snapshot::kFullAOT) {
           // For precompiled static fields, the value was already reset and
           // initializer_ now contains a Function.
-          s->WriteRef(field->ptr()->value_.static_value_);
+          WriteField(field, value_.static_value_);
         } else if (Field::ConstBit::decode(field->ptr()->kind_bits_)) {
           // Do not reset const fields.
-          s->WriteRef(field->ptr()->value_.static_value_);
+          WriteField(field, value_.static_value_);
         } else {
           // Otherwise, for static fields we write out the initial static value.
-          s->WriteRef(field->ptr()->initializer_.saved_value_);
+          WriteField(field, initializer_.saved_value_);
         }
       } else {
-        s->WriteRef(field->ptr()->value_.offset_);
+        WriteField(field, value_.offset_);
       }
       // Write out the initializer function or saved initial value.
       if (kind == Snapshot::kFullAOT) {
-        s->WriteRef(field->ptr()->initializer_.precompiled_);
+        WriteField(field, initializer_.precompiled_);
       } else {
-        s->WriteRef(field->ptr()->initializer_.saved_value_);
+        WriteField(field, initializer_.saved_value_);
       }
       if (kind != Snapshot::kFullAOT) {
         // Write out the guarded list length.
-        s->WriteRef(field->ptr()->guarded_list_length_);
+        WriteField(field, guarded_list_length_);
       }
       if (kind == Snapshot::kFullJIT) {
-        s->WriteRef(field->ptr()->dependent_code_);
+        WriteField(field, dependent_code_);
       }
 
       if (kind != Snapshot::kFullAOT) {
@@ -1369,29 +1369,29 @@ class CodeSerializationCluster : public SerializationCluster {
         s->WriteInstructions(code->ptr()->active_instructions_, code);
       }
 
-      s->WriteRef(code->ptr()->object_pool_);
-      s->WriteRef(code->ptr()->owner_);
-      s->WriteRef(code->ptr()->exception_handlers_);
-      s->WriteRef(code->ptr()->pc_descriptors_);
+      WriteField(code, object_pool_);
+      WriteField(code, owner_);
+      WriteField(code, exception_handlers_);
+      WriteField(code, pc_descriptors_);
 #if defined(DART_PRECOMPILED_RUNTIME) || defined(DART_PRECOMPILER)
-      s->WriteRef(code->ptr()->catch_entry_.catch_entry_moves_maps_);
+      WriteField(code, catch_entry_.catch_entry_moves_maps_);
 #else
-      s->WriteRef(code->ptr()->catch_entry_.variables_);
+      WriteField(code, catch_entry_.variables_);
 #endif
-      s->WriteRef(code->ptr()->stackmaps_);
+      WriteField(code, stackmaps_);
       if (FLAG_dwarf_stack_traces) {
-        s->WriteRef(Array::null());
-        s->WriteRef(CodeSourceMap::null());
+        WriteFieldValue(inlined_id_to_function_, Array::null());
+        WriteFieldValue(code_source_map_, CodeSourceMap::null());
       } else {
-        s->WriteRef(code->ptr()->inlined_id_to_function_);
-        s->WriteRef(code->ptr()->code_source_map_);
+        WriteField(code, inlined_id_to_function_);
+        WriteField(code, code_source_map_);
       }
       if (kind == Snapshot::kFullJIT) {
-        s->WriteRef(code->ptr()->deopt_info_array_);
-        s->WriteRef(code->ptr()->static_calls_target_table_);
+        WriteField(code, deopt_info_array_);
+        WriteField(code, static_calls_target_table_);
       }
-      NOT_IN_PRODUCT(s->WriteRef(code->ptr()->await_token_positions_));
-      NOT_IN_PRODUCT(s->WriteRef(code->ptr()->return_address_metadata_));
+      NOT_IN_PRODUCT(WriteField(code, await_token_positions_));
+      NOT_IN_PRODUCT(WriteField(code, return_address_metadata_));
 
       s->Write<int32_t>(code->ptr()->state_bits_);
     }
@@ -1607,11 +1607,11 @@ class ObjectPoolSerializationCluster : public SerializationCluster {
               // Natives can run while precompiling, becoming linked and
               // switching their stub. Reset to the initial stub used for
               // lazy-linking.
-              s->WriteRef(StubCode::CallBootstrapNative().raw());
+              s->WriteElementRef(StubCode::CallBootstrapNative().raw(), j);
               break;
             }
 #endif
-            s->WriteRef(entry.raw_obj_);
+            s->WriteElementRef(entry.raw_obj_, j);
             break;
           }
           case ObjectPool::kImmediate: {
@@ -1631,7 +1631,7 @@ class ObjectPoolSerializationCluster : public SerializationCluster {
               payload->trampoline = NULL;
               payload->native_function = NULL;
             }
-            s->WriteRef(raw);
+            s->WriteElementRef(raw, j);
             break;
           }
           case ObjectPool::kNativeFunction:
@@ -1838,7 +1838,7 @@ class ExceptionHandlersSerializationCluster : public SerializationCluster {
       AutoTraceObject(handlers);
       intptr_t length = handlers->ptr()->num_entries_;
       s->WriteUnsigned(length);
-      s->WriteRef(handlers->ptr()->handled_types_data_);
+      WriteField(handlers, handled_types_data_);
       for (intptr_t j = 0; j < length; j++) {
         const ExceptionHandlerInfo& info = handlers->ptr()->data()[j];
         s->Write<uint32_t>(info.handler_pc_offset);
@@ -1934,9 +1934,9 @@ class ContextSerializationCluster : public SerializationCluster {
       AutoTraceObject(context);
       intptr_t length = context->ptr()->num_variables_;
       s->WriteUnsigned(length);
-      s->WriteRef(context->ptr()->parent_);
+      WriteField(context, parent_);
       for (intptr_t j = 0; j < length; j++) {
-        s->WriteRef(context->ptr()->data()[j]);
+        s->WriteElementRef(context->ptr()->data()[j], j);
       }
     }
   }
@@ -2296,7 +2296,7 @@ class SubtypeTestCacheSerializationCluster : public SerializationCluster {
     for (intptr_t i = 0; i < count; i++) {
       RawSubtypeTestCache* cache = objects_[i];
       AutoTraceObject(cache);
-      s->WriteRef(cache->ptr()->cache_);
+      WriteField(cache, cache_);
     }
   }
 
@@ -2525,7 +2525,8 @@ class InstanceSerializationCluster : public SerializationCluster {
       while (offset < next_field_offset) {
         RawObject* raw_obj = *reinterpret_cast<RawObject**>(
             reinterpret_cast<uword>(instance->ptr()) + offset);
-        s->WriteRef(raw_obj);
+        // TODO(sjindel): Use the user-defined field names in the profile.
+        s->WriteElementRef(raw_obj, offset);
         offset += kWordSize;
       }
     }
@@ -3810,7 +3811,7 @@ class LinkedHashMapSerializationCluster : public SerializationCluster {
       AutoTraceObject(map);
       s->Write<bool>(map->IsCanonical());
 
-      s->WriteRef(map->ptr()->type_arguments_);
+      WriteField(map, type_arguments_);
 
       const intptr_t used_data = Smi::Value(map->ptr()->used_data_);
       ASSERT((used_data & 1) == 0);  // Keys + values, so must be even.
@@ -3825,8 +3826,8 @@ class LinkedHashMapSerializationCluster : public SerializationCluster {
         RawObject* key = data_elements[i];
         if (key != data_array) {
           RawObject* value = data_elements[i + 1];
-          s->WriteRef(key);
-          s->WriteRef(value);
+          s->WriteElementRef(key, i);
+          s->WriteElementRef(value, i + 1);
         }
       }
     }
@@ -3934,9 +3935,9 @@ class ArraySerializationCluster : public SerializationCluster {
       intptr_t length = Smi::Value(array->ptr()->length_);
       s->WriteUnsigned(length);
       s->Write<bool>(array->IsCanonical());
-      s->WriteRef(array->ptr()->type_arguments_);
+      WriteField(array, type_arguments_);
       for (intptr_t j = 0; j < length; j++) {
-        s->WriteRef(array->ptr()->data()[j]);
+        s->WriteElementRef(array->ptr()->data()[j], j);
       }
     }
   }
@@ -4221,7 +4222,10 @@ void Serializer::TraceStartWritingObject(const char* type,
   }
 
   object_currently_writing_ = ProfilingObject{
-      obj, id, stream_.Position(), type,
+      obj,
+      id,
+      stream_.Position(),
+      type,
   };
   profile_writer_->SetObjectTypeAndName(
       {V8SnapshotProfileWriter::kSnapshot, id}, type, name_str);
@@ -4387,10 +4391,9 @@ void Serializer::WriteInstructions(RawInstructions* instr, RawCode* code) {
         offset_space, offset < 0 ? -offset : offset};
     V8SnapshotProfileWriter::ObjectId from_object = {
         V8SnapshotProfileWriter::kSnapshot, object_currently_writing_.id_};
-    // SAMIR_TODO: Get actual offset or name here.
     profile_writer_->AttributeReferenceTo(
         from_object, {to_object, V8SnapshotProfileWriter::Reference::kProperty,
-                      V8SnapshotProfileWriter::kPropertyString});
+                      profile_writer_->EnsureString("<instructions>")});
   }
 }
 
@@ -4403,7 +4406,7 @@ void Serializer::TraceDataOffset(uint32_t offset) {
     V8SnapshotProfileWriter::ObjectId from_object = {
         V8SnapshotProfileWriter::kSnapshot, object_currently_writing_.id_};
     V8SnapshotProfileWriter::ObjectId to_object = {offset_space, offset};
-    // SAMIR_TODO: Give this edge a more appropriate type than element
+    // TODO(sjindel): Give this edge a more appropriate type than element
     // (internal, maybe?).
     profile_writer_->AttributeReferenceTo(
         from_object,

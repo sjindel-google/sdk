@@ -2,6 +2,9 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+#ifndef RUNTIME_VM_RAW_OBJECT_FIELDS_H_
+#define RUNTIME_VM_RAW_OBJECT_FIELDS_H_
+
 #include <utility>
 
 #include "vm/hash_map.h"
@@ -14,13 +17,11 @@ namespace dart {
 
 class OffsetsTable : public ZoneAllocated {
  public:
-  OffsetsTable(Zone *zone);
+  explicit OffsetsTable(Zone* zone);
 
   // Returns 'nullptr' if no offset was found.
   // Otherwise, the returned string is allocated in global static memory.
-  const char* FieldNameForOffset(
-      const char* class_name,
-      intptr_t offset);
+  const char* FieldNameForOffset(const char* class_name, intptr_t offset);
 
  private:
   struct OffsetsTableEntry {
@@ -59,7 +60,7 @@ class OffsetsTable : public ZoneAllocated {
 
 class OffsetsTable : public ZoneAllocated {
  public:
-  OffsetsTable(Zone* zone) {}
+  explicit OffsetsTable(Zone* zone) {}
 
   const char* FieldNameForOffset(const char* class_name, intptr_t offset) {
     return nullptr;
@@ -69,3 +70,5 @@ class OffsetsTable : public ZoneAllocated {
 #endif
 
 }  // namespace dart
+
+#endif  // RUNTIME_VM_RAW_OBJECT_FIELDS_H_

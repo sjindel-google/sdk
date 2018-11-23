@@ -30,9 +30,7 @@ struct StringToIntMapTraits {
 
   static Key KeyOf(Pair pair) { return pair.key; }
 
-  static size_t Hashcode(Key key) {
-    return String::Hash(key, strlen(key));
-  }
+  static size_t Hashcode(Key key) { return String::Hash(key, strlen(key)); }
 
   static bool IsKeyEqual(Pair x, Key y) { return strcmp(x.key, y) == 0; }
 };
@@ -107,6 +105,7 @@ class V8SnapshotProfileWriter : public ZoneAllocated {
   void Write(const char* file);
 
   intptr_t EnsureString(const char* str);
+
  private:
   static constexpr intptr_t kNumNodeFields = 5;
   static constexpr intptr_t kNumEdgeFields = 3;

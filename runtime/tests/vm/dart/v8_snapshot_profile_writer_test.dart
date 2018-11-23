@@ -12,17 +12,12 @@ String path(List<String> segments) {
   return "/" + segments.join("/");
 }
 
-test(bool use_elf) async {
+test(String sdkRoot, bool use_elf) async {
   if (Platform.isWindows) return;
 
-  final List<String> sdkBaseSegments =
-      Uri.file(Platform.resolvedExecutable).pathSegments.toList();
-  sdkBaseSegments
-      .replaceRange(sdkBaseSegments.indexOf("out"), sdkBaseSegments.length, []);
-
   // Generate the snapshot profile.
-  final String thisTestPath = path(sdkBaseSegments) +
-      "/runtime/tests/vm/dart/v8_snapshot_profile_writer_test.dart";
+  final String thisTestPath =
+      "$sdkRoot/runtime/tests/vm/dart/v8_snapshot_profile_writer_test.dart";
 
   final Directory temp = await Directory.systemTemp.createTemp();
   final String snapshotPath = temp.path + "/test.snap";
@@ -40,7 +35,7 @@ test(bool use_elf) async {
   final ProcessResult result = await Process.run(
     "pkg/vm/tool/precompiler2",
     precompiler2Args,
-    workingDirectory: path(sdkBaseSegments),
+    workingDirectory: sdkRoot,
     runInShell: true,
   );
 
@@ -96,7 +91,73 @@ test(bool use_elf) async {
   Expect.isTrue((actual - expected).abs() / actual < 0.01);
 }
 
+Match matchComplete(RegExp regexp, String line) {
+  Match match = regexp.firstMatch(line);
+  if (match == null) return match;
+  if (match.start != 0 || match.end != line.length) return null;
+  return match;
+}
+
+testMacros(String sdkRoot) async {
+  const String className = "([a-z0-9A-Z]+)";
+  const String rawClass = "Raw$className";
+  const String fieldName = "([a-z0-9A-Z_]+)";
+
+  final Map<String, Set<String>> fields = {};
+
+  final String rawObjectFieldsPath = "$sdkRoot/runtime/vm/raw_object_fields.cc";
+  final RegExp fieldEntry = RegExp(" *F\\($className, $fieldName\\) *\\\\?");
+
+  await for (String line in File(rawObjectFieldsPath)
+      .openRead()
+      .transform(utf8.decoder)
+      .transform(LineSplitter())) {
+    Match match = matchComplete(fieldEntry, line);
+    if (match != null) {
+      fields
+          .putIfAbsent(match.group(1), () => Set<String>())
+          .add(match.group(2));
+    }
+  }
+
+  final RegExp classStart = RegExp("class $rawClass : public $rawClass {");
+  final RegExp classEnd = RegExp("}");
+  final RegExp field = RegExp("  $rawClass. +$fieldName;.*");
+
+  final String rawObjectPath = "$sdkRoot/runtime/vm/raw_object.h";
+
+  String currentClass;
+  await for (String line in File(rawObjectPath)
+      .openRead()
+      .transform(utf8.decoder)
+      .transform(LineSplitter())) {
+    Match match = matchComplete(classStart, line);
+    if (match != null) {
+      currentClass = match.group(1);
+      continue;
+    }
+
+    match = matchComplete(classEnd, line);
+    if (match != null) {
+      currentClass = null;
+      continue;
+    }
+
+    match = matchComplete(field, line);
+    if (match != null && currentClass != null) {
+      Expect.isTrue(fields[currentClass].contains(match.group(2)));
+    }
+  }
+}
+
 main() async {
-  test(false);
-  test(true);
+  final List<String> sdkBaseSegments =
+      Uri.file(Platform.resolvedExecutable).pathSegments.toList();
+  sdkBaseSegments
+      .replaceRange(sdkBaseSegments.length - 3, sdkBaseSegments.length, []);
+  String sdkRoot = path(sdkBaseSegments);
+
+  test(sdkRoot, false);
+  test(sdkRoot, true);
+  testMacros(sdkRoot);
 }

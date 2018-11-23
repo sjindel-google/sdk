@@ -18,6 +18,26 @@ const char* ZoneString(Zone* Z, const char* str) {
   return dest;
 }
 
+const char* ZonePrintf(Zone* Z, const char* format, ...) {
+  const intptr_t start_len = strlen(format) + 100;
+  char* dest = Z->Alloc<char>(start_len);
+
+  va_list args;
+  va_start(args, format);
+  intptr_t written = vsnprintf(dest, start_len, format, args);
+  va_end(args);
+
+  if (written >= start_len) {
+    dest = Z->Alloc<char>(written + 1);
+    va_list args;
+    va_start(args, format);
+    vsnprintf(dest, written + 1, format, args);
+    va_end(args);
+  }
+
+  return dest;
+}
+
 V8SnapshotProfileWriter::V8SnapshotProfileWriter(Zone* zone)
     : zone_(zone),
       node_types_(zone_),
@@ -57,7 +77,7 @@ void V8SnapshotProfileWriter::SetObjectTypeAndName(ObjectId object_id,
   info->type = type_id;
 
   if (name != nullptr) {
-    info->name = EnsureString(name);
+    info->name = EnsureString(ZonePrintf(zone_, "[%s] %s", type, name));
   } else {
     info->name = EnsureString(type);
   }
@@ -76,7 +96,8 @@ void V8SnapshotProfileWriter::AttributeReferenceTo(ObjectId object_id,
   ASSERT(reference.offset_or_name >= 0);
   info->edges->Add({
       reference.reference_type == Reference::kElement ? kElement : kProperty,
-      reference.offset_or_name, reference.to_object_id,
+      reference.offset_or_name,
+      reference.to_object_id,
   });
   ++edge_count_;
 }
