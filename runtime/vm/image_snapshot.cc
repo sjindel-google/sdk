@@ -455,8 +455,8 @@ void AssemblyImageWriter::WriteText(WriteStream* clustered_stream, bool vm) {
         name = OS::SCreate(zone, "Precompiler_%s_%" Pd, name, i);
         if (FLAG_disassemble_image) {
           Disassembler::DisassembleCodeHelper(name, code, code.is_optimized());
-          assembly_stream_.Print("%s:\n", name);
         }
+        assembly_stream_.Print("%s:\n", name);
       } else {
         UNREACHABLE();
       }
