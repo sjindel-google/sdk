@@ -452,7 +452,7 @@ void AssemblyImageWriter::WriteText(WriteStream* clustered_stream, bool vm) {
       } else if (owner.IsFunction()) {
         const char* name = Function::Cast(owner).ToFullyQualifiedCString();
         EnsureIdentifier(const_cast<char*>(name));
-        name = OS::SCreate(zone, "Precompiler_%s_%" Pd, name, i);
+        name = OS::SCreate(zone, "Precompiled_%s_%" Pd, name, i);
         if (FLAG_disassemble_image) {
           Disassembler::DisassembleCodeHelper(name, code, code.is_optimized());
         }
