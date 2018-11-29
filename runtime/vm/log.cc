@@ -64,6 +64,7 @@ void Log::Print(const char* format, ...) {
   va_end(args);
 }
 
+volatile int ctr2 = 0;
 void Log::VPrint(const char* format, va_list args) {
   if (this == NoOpLog()) {
     return;
@@ -81,6 +82,11 @@ void Log::VPrint(const char* format, va_list args) {
   va_copy(print_args, args);
   Utils::VSNPrint(buffer, (len + 1), format, print_args);
   va_end(print_args);
+
+
+  if (strstr(buffer, "Found:")) {
+    ++ctr2;
+  }
 
   // Append.
   // NOTE: does not append the '\0' character.
