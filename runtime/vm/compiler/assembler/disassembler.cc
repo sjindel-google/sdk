@@ -37,9 +37,9 @@ void DisassembleToStdout::ConsumeInstruction(char* hex_buffer,
     }
   }
   THR_Print("%s", human_buffer);
-  if (object != NULL) {
-    THR_Print("   %s", object->ToCString());
-  }
+  // if (object != NULL) {
+  //   THR_Print("   %s", object->ToCString());
+  // }
   THR_Print("\n");
 }
 
@@ -206,9 +206,13 @@ void Disassembler::Disassemble(uword start,
   }
 }
 
+volatile int ctr = 0;
 void Disassembler::DisassembleCodeHelper(const char* function_fullname,
                                          const Code& code,
                                          bool optimized) {
+  if (strstr(function_fullname, "Precompiler_dart_io_FileStat_toString_2682")) {
+    ++ctr;
+  }
   Zone* zone = Thread::Current()->zone();
   LocalVarDescriptors& var_descriptors = LocalVarDescriptors::Handle(zone);
   if (FLAG_print_variable_descriptors) {
@@ -249,7 +253,7 @@ void Disassembler::DisassembleCodeHelper(const char* function_fullname,
   const auto& instructions = Instructions::Handle(code.instructions());
   const uword start = instructions.PayloadStart();
 
-#if !defined(DART_PRECOMPILED_RUNTIME)
+#if !defined(DART_PRECOMPILER)
   const Array& deopt_table = Array::Handle(zone, code.deopt_info_array());
   intptr_t deopt_table_length = DeoptTable::GetLength(deopt_table);
   if (deopt_table_length > 0) {
@@ -269,7 +273,7 @@ void Disassembler::DisassembleCodeHelper(const char* function_fullname,
     }
     THR_Print("}\n");
   }
-#endif  // !defined(DART_PRECOMPILED_RUNTIME)
+#endif  // !defined(DART_PRECOMPILER)
 
   THR_Print("StackMaps for function '%s' {\n", function_fullname);
   if (code.stackmaps() != Array::null()) {
@@ -385,8 +389,10 @@ void Disassembler::DisassembleCodeHelper(const char* function_fullname,
 void Disassembler::DisassembleCode(const Function& function,
                                    const Code& code,
                                    bool optimized) {
-  const char* function_fullname = function.ToFullyQualifiedCString();
-  DisassembleCodeHelper(function_fullname, code, optimized);
+  if (!FLAG_disassemble_image)  {
+    const char* function_fullname = function.ToFullyQualifiedCString();
+    DisassembleCodeHelper(function_fullname, code, optimized);
+  }
 }
 
 #endif  // !defined(PRODUCT) || defined(FORCE_INCLUDE_DISASSEMBLER)

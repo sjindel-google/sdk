@@ -5,6 +5,7 @@
 #include "vm/image_snapshot.h"
 
 #include "platform/assert.h"
+#include "vm/compiler/assembler/disassembler.h"
 #include "vm/compiler/backend/code_statistics.h"
 #include "vm/dwarf.h"
 #include "vm/hash.h"
@@ -449,9 +450,13 @@ void AssemblyImageWriter::WriteText(WriteStream* clustered_stream, bool vm) {
         assembly_stream_.Print("Precompiled_AllocationStub_%s_%" Pd ":\n", name,
                                i);
       } else if (owner.IsFunction()) {
-        const char* name = Function::Cast(owner).ToQualifiedCString();
+        const char* name = Function::Cast(owner).ToFullyQualifiedCString();
         EnsureIdentifier(const_cast<char*>(name));
-        assembly_stream_.Print("Precompiled_%s_%" Pd ":\n", name, i);
+        name = OS::SCreate(zone, "Precompiler_%s_%" Pd, name, i);
+        if (FLAG_disassemble_image) {
+          Disassembler::DisassembleCodeHelper(name, code, code.is_optimized());
+          assembly_stream_.Print("%s:\n", name);
+        }
       } else {
         UNREACHABLE();
       }

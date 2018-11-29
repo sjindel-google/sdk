@@ -175,11 +175,11 @@ class Disassembler : public AllStatic {
                               const Code& code,
                               bool optimized);
 
- private:
   static void DisassembleCodeHelper(const char* function_fullname,
                                     const Code& code,
                                     bool optimized);
 
+ private:
   static const int kHexadecimalBufferSize = 32;
   static const int kUserReadableBufferSize = 256;
 };
