@@ -433,7 +433,7 @@ class _CompactIterator<E> implements Iterator<E> {
   final int _checkSum;
   E current;
 
-  _CompactIterator(table, this._data, this._len, this._offset, this._step)
+  _CompactIterator(_HashBase table, this._data, this._len, this._offset, this._step)
       : _table = table,
         _checkSum = table._checkSum;
 
