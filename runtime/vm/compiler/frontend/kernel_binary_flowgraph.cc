@@ -612,10 +612,7 @@ FlowGraph* StreamingFlowGraphBuilder::BuildGraphOfImplicitClosureFunction(
 
   // Setup multiple entrypoints if useful.
   FunctionEntryInstr* extra_entry = nullptr;
-  // TODO(#34162): We can still skip the non-generic-covariant parameter checks
-  // when the target has only 'this' uses.
-  if (function.MayHaveUncheckedEntryPoint(I) &&
-      parent_attrs.has_non_this_uses) {
+  if (function.MayHaveUncheckedEntryPoint(I)) {
     // The prologue for a closure will always have context handling (e.g.
     // setting up the 'this_variable'), but we don't need it on the unchecked
     // entry because the only time we reference this is for loading the
