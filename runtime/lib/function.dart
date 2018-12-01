@@ -15,9 +15,7 @@ class _Closure implements Function {
 
   _Closure get call => this;
 
-  // The real bound is "_Closure", but unfortunately function types are not
-  // subtypes of "_Closure".
-  static T _clone<T extends Function>(T closure) native "Closure_clone";
+  _Closure _clone() native "Closure_clone";
 
   int _computeHash() native "Closure_computeHash";
 
