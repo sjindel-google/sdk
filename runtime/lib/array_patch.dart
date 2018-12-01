@@ -24,7 +24,7 @@ class List<E> {
 
   @patch
   factory List.from(Iterable elements, {bool growable: true}) {
-    if (elements is EfficientLengthIterable) {
+    if (elements is EfficientLengthIterable<E>) {
       int length = elements.length;
       var list = growable ? new _GrowableList<E>(length) : new _List<E>(length);
       if (length > 0) {
@@ -36,12 +36,21 @@ class List<E> {
       }
       return list;
     }
-    List<E> list = new _GrowableList<E>(0);
-    for (E e in elements) {
-      list.add(e);
+    if (elements is Iterable<E>) {
+      List<E> list = new _GrowableList<E>(0);
+      for (E e in elements) {
+        list.add(e);
+      }
+      if (growable) return list;
+      return makeListFixedLength(list);
+    } else {
+      List<E> list = new _GrowableList<E>(0);
+      for (E e in elements) {
+        list.add(e);
+      }
+      if (growable) return list;
+      return makeListFixedLength(list);
     }
-    if (growable) return list;
-    return makeListFixedLength(list);
   }
 
   @patch
