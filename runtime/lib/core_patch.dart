@@ -24,7 +24,8 @@ import "dart:_internal"
         is64Bit,
         makeFixedListUnmodifiable,
         makeListFixedLength,
-        patch;
+        patch,
+        unsafeCast;
 
 import "dart:async" show Completer, Future, Timer;
 
@@ -116,7 +117,8 @@ class _SyncIterable<T> extends IterableBase<T> {
   Iterator<T> get iterator {
     // Note: _Closure._clone returns _Closure which is not related to
     // _SyncGeneratorCallback, which means we need explicit cast.
-    return new _SyncIterator<T>(_Closure._clone(_moveNextFn));
+    return new _SyncIterator<T>(unsafeCast<_SyncGeneratorCallback<T>>(
+        unsafeCast<_Closure>(_moveNextFn)._clone()));
   }
 }
 
