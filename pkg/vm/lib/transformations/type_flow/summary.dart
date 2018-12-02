@@ -474,11 +474,12 @@ class Summary {
   final int parameterCount;
   final int positionalParameterCount;
   final int requiredParameterCount;
+  final Member member;
 
   List<Statement> _statements = <Statement>[];
   TypeExpr result = null;
 
-  Summary(
+  Summary(this.member,
       {this.parameterCount: 0,
       this.positionalParameterCount: 0,
       this.requiredParameterCount: 0});
@@ -511,6 +512,10 @@ class Summary {
     assertx(requiredParameterCount <= positionalArgCount);
     assertx(positionalArgCount <= positionalParameterCount);
     assertx(namedArgCount <= parameterCount - positionalParameterCount);
+
+    if ("$member" == "dart.core::List::of") {
+      print(arguments);
+    }
 
     // Interpret statements sequentially, calculating the result type
     // of each statement and putting it into the 'types' list parallel

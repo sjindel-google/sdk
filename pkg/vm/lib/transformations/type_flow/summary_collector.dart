@@ -318,7 +318,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       if (hasReceiver) {
         final int numArgs =
             fieldSummaryType == FieldSummaryType.kInitializer ? 1 : 2;
-        _summary = new Summary(
+        _summary = new Summary(member,
             parameterCount: numArgs, positionalParameterCount: numArgs);
         // TODO(alexmarkov): subclass cone
         _receiver = _declareParameter(
@@ -326,7 +326,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
             isReceiver: true);
         _environment.thisType = member.enclosingClass?.thisType;
       } else {
-        _summary = new Summary();
+        _summary = new Summary(member);
       }
 
       _translator = new RuntimeTypeTranslator(
@@ -348,7 +348,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       final numTypeParameters = numTypeParams(member);
       final firstParamIndex = (hasReceiver ? 1 : 0) + numTypeParameters;
 
-      _summary = new Summary(
+      _summary = new Summary(member,
           parameterCount: firstParamIndex +
               function.positionalParameters.length +
               function.namedParameters.length,
