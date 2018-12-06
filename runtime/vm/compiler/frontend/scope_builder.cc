@@ -299,7 +299,7 @@ ScopeBuildingResult* ScopeBuilder::BuildScopes() {
           field_helper.ReadUntilIncluding(FieldHelper::kFlags);
 
           if (field_helper.IsCovariant()) {
-            result_->setter_value->set_is_explicit_covariant_parameter();
+            result_->setter_value->set_is_explicit_covariant_parameter(true);
           } else if (!field_helper.IsGenericCovariantImpl() ||
                      (!attrs.has_non_this_uses && !attrs.has_tearoff_uses)) {
             result_->setter_value->set_type_check_mode(
@@ -1436,7 +1436,7 @@ void ScopeBuilder::AddVariableDeclarationParameter(
     variable->set_is_final();
   }
   if (helper.IsCovariant()) {
-    variable->set_is_explicit_covariant_parameter();
+    variable->set_is_explicit_covariant_parameter(true);
   }
   if (variable->name().raw() == Symbols::IteratorParameter().raw()) {
     variable->set_is_forced_stack();
@@ -1473,6 +1473,14 @@ void ScopeBuilder::AddVariableDeclarationParameter(
       variable->set_type_check_mode(LocalVariable::kTypeCheckedByCaller);
       break;
   }
+
+  // TODO(sjindel): We can also skip these checks on dynamic invocations as
+  // well.
+  if (parameter_type.IsSkipCheck()) {
+    variable->set_is_explicit_covariant_parameter(false);
+    variable->set_type_check_mode(LocalVariable::kTypeCheckedByCaller);
+  }
+
   scope_->InsertParameterAt(pos, variable);
   result_->locals.Insert(helper_.data_program_offset_ + kernel_offset,
                          variable);

@@ -208,6 +208,8 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
         _setInferredType(member, _typeFlowAnalysis.fieldType(member));
       } else {
         Args<Type> argTypes = _typeFlowAnalysis.argumentTypes(member);
+        Set<VariableDeclaration> uncheckedParameters =
+            _typeFlowAnalysis.uncheckedParameters(member);
         assertx(argTypes != null);
 
         final int firstParamIndex =
@@ -219,7 +221,8 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
 
         for (int i = 0; i < positionalParams.length; i++) {
           _setInferredType(
-              positionalParams[i], argTypes.values[firstParamIndex + i]);
+              positionalParams[i], argTypes.values[firstParamIndex + i],
+              skipCheck: uncheckedParameters.contains(positionalParams[i]));
         }
 
         // TODO(dartbug.com/32292): make sure parameters are sorted in kernel
@@ -229,7 +232,8 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
           final param = findNamedParameter(member.function, names[i]);
           assertx(param != null);
           _setInferredType(param,
-              argTypes.values[firstParamIndex + positionalParams.length + i]);
+              argTypes.values[firstParamIndex + positionalParams.length + i],
+              skipCheck: uncheckedParameters.contains(param));
         }
 
         // TODO(alexmarkov): figure out how to pass receiver type.

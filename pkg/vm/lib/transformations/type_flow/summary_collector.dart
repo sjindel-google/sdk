@@ -338,7 +338,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       } else {
         Parameter valueParam = _declareParameter("value", member.type, null);
         TypeExpr runtimeType = _translator.translate(member.type);
-        final check = new TypeCheck(valueParam, runtimeType, null);
+        final check = new TypeCheck(valueParam, runtimeType, member);
         _summary.add(check);
         _summary.result = check;
       }
@@ -413,13 +413,15 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       for (int i = 0; i < function.positionalParameters.length; ++i) {
         Join v = _declareVariable(function.positionalParameters[i],
             useTypeCheck:
-                function.positionalParameters[i].isGenericCovariantImpl,
+                function.positionalParameters[i].isGenericCovariantImpl ||
+                    function.positionalParameters[i].isCovariant,
             checkType: useTypesFrom.positionalParameters[i].type);
         v.values.add(_summary.statements[count++]);
       }
       for (int i = 0; i < function.namedParameters.length; ++i) {
         Join v = _declareVariable(function.namedParameters[i],
-            useTypeCheck: function.namedParameters[i].isGenericCovariantImpl,
+            useTypeCheck: function.namedParameters[i].isGenericCovariantImpl ||
+                function.namedParameters[i].isCovariant,
             checkType: useTypesFrom.namedParameters[i].type);
         v.values.add(_summary.statements[count++]);
       }
@@ -734,7 +736,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
 
     TypeExpr runtimeType = _translator.translate(node.type);
     if (runtimeType is Statement) {
-      result = new TypeCheck(operand, runtimeType, /*parameter=*/ null);
+      result = new TypeCheck(operand, runtimeType, /*parameter=*/ node);
       _summary.add(result);
     }
 
