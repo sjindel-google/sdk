@@ -5,13 +5,8 @@ import "dart:core" as core;
 static method isPrime([@vm.inferred-type.metadata=int?] dynamic n) → core::bool {
   if([@vm.inferred-type.metadata=!? (skip check)] [@vm.direct-call.metadata=dart.core::_IntegerImplementation::<??] [@vm.inferred-type.metadata=dart.core::bool] n.<(2) as{TypeError} core::bool)
     return false;
-<<<<<<< HEAD
-  for (core::int i = 2; [@vm.direct-call.metadata=dart.core::_IntegerImplementation::<=??] [@vm.inferred-type.metadata=dart.core::bool (skip check)] [@vm.direct-call.metadata=dart.core::_IntegerImplementation::*??] [@vm.inferred-type.metadata=int? (skip check)] i.{core::num::*}(i).{core::num::<=}(n as{TypeError} core::num); i = [@vm.direct-call.metadata=dart.core::_IntegerImplementation::+??] [@vm.inferred-type.metadata=int? (skip check)] i.{core::num::+}(1)) {
-    if([@vm.inferred-type.metadata=dart.core::bool] [@vm.direct-call.metadata=dart.core::_IntegerImplementation::%??] [@vm.inferred-type.metadata=int?] n.%(i).{core::Object::==}(0))
-=======
   for (core::int i = 2; [@vm.direct-call.metadata=dart.core::_IntegerImplementation::<=??] [@vm.inferred-type.metadata=dart.core::bool (skip check)] [@vm.direct-call.metadata=dart.core::_IntegerImplementation::*??] [@vm.inferred-type.metadata=int? (skip check)] i.{core::num::*}(i).{core::num::<=}([@vm.inferred-type.metadata=!? (skip check)] n as{TypeError} core::num); i = [@vm.direct-call.metadata=dart.core::_IntegerImplementation::+??] [@vm.inferred-type.metadata=int? (skip check)] i.{core::num::+}(1)) {
-    if([@vm.inferred-type.metadata=dart.core::bool (skip check)] [@vm.direct-call.metadata=dart.core::_IntegerImplementation::%??] [@vm.inferred-type.metadata=int?] n.%(i).{core::Object::==}(0))
->>>>>>> explicit checks
+    if([@vm.inferred-type.metadata=dart.core::bool] [@vm.direct-call.metadata=dart.core::_IntegerImplementation::%??] [@vm.inferred-type.metadata=int?] n.%(i).{core::Object::==}(0))
       return false;
   }
   return true;
