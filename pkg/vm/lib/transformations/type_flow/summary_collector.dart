@@ -283,6 +283,7 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   final GenericInterfacesInfo _genericInterfacesInfo;
 
   final Map<TreeNode, Call> callSites = <TreeNode, Call>{};
+  final Map<AsExpression, TypeCheck> explicitCasts = <AsExpression, TypeCheck>{};
   final _FallthroughDetector _fallthroughDetector = new _FallthroughDetector();
 
   Summary _summary;
@@ -731,14 +732,11 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
   TypeExpr visitAsExpression(AsExpression node) {
     TypeExpr operand = _visit(node.operand);
     Type type = new Type.fromStatic(node.type);
-
-    TypeExpr result = _makeNarrow(operand, type);
-
     TypeExpr runtimeType = _translator.translate(node.type);
-    if (runtimeType is Statement) {
-      result = new TypeCheck(operand, runtimeType, /*parameter=*/ node);
-      _summary.add(result);
-    }
+    TypeExpr result = new TypeCheck(operand, runtimeType, /*parameter=*/ node);
+    explicitCasts[node] = result;
+    result = _makeNarrow(result, type);
+    _summary.add(result);
 
     return result;
   }

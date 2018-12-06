@@ -16,6 +16,7 @@ import 'package:kernel/type_environment.dart';
 
 import 'analysis.dart';
 import 'calls.dart';
+import 'summary.dart';
 import 'summary_collector.dart';
 import 'types.dart';
 import 'utils.dart';
@@ -317,6 +318,15 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
   visitStaticGet(StaticGet node) {
     _annotateCallSite(node);
     super.visitStaticGet(node);
+  }
+
+  @override
+  visitAsExpression(AsExpression node) {
+    TypeCheck check = _typeFlowAnalysis.explicitCast(node);
+    if (check != null && check.canAlwaysSkip) {
+      _setInferredType(node, Type.nullableAny(), skipCheck: true);
+    }
+    super.visitAsExpression(node);
   }
 }
 
