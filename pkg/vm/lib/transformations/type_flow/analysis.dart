@@ -154,7 +154,8 @@ class _DirectInvocation extends _Invocation {
     //
     // TODO(sjindel): Use [TypeCheck] to avoid bounds checks.
     if (selector.member.function != null) {
-      typeChecksNeeded = !selector.member.function.typeParameters.isEmpty;
+      typeChecksNeeded = selector.member.function.typeParameters
+          .any((t) => t.isGenericCovariantImpl);
     }
   }
 
