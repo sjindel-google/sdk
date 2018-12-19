@@ -1423,7 +1423,7 @@ class TypeFlowAnalysis implements EntryPointsListener, CallHandler {
 
   Args<Type> argumentTypes(Member member) => _summaries[member]?.argumentTypes;
 
-  Set<VariableDeclaration> uncheckedParameters(Member member) =>
+  List<VariableDeclaration> uncheckedParameters(Member member) =>
       _summaries[member]?.uncheckedParameters;
 
   bool isTearOffTaken(Member member) => _tearOffTaken.contains(member);

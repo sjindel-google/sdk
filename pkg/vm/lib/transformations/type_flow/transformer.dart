@@ -209,7 +209,7 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
         _setInferredType(member, _typeFlowAnalysis.fieldType(member));
       } else {
         Args<Type> argTypes = _typeFlowAnalysis.argumentTypes(member);
-        Set<VariableDeclaration> uncheckedParameters =
+        final uncheckedParameters =
             _typeFlowAnalysis.uncheckedParameters(member);
         assertx(argTypes != null);
 

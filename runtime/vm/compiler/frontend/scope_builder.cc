@@ -1477,7 +1477,6 @@ void ScopeBuilder::AddVariableDeclarationParameter(
   // TODO(sjindel): We can also skip these checks on dynamic invocations as
   // well.
   if (parameter_type.IsSkipCheck()) {
-    variable->set_is_explicit_covariant_parameter(false);
     variable->set_type_check_mode(LocalVariable::kTypeCheckedByCaller);
   }
 
