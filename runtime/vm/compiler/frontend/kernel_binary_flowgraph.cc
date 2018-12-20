@@ -4360,9 +4360,6 @@ Fragment StreamingFlowGraphBuilder::BuildIsExpression(TokenPosition* p) {
 }
 
 Fragment StreamingFlowGraphBuilder::BuildAsExpression(TokenPosition* p) {
-  const InferredTypeMetadata input_type =
-      inferred_type_metadata_helper_.GetInferredType(ReaderOffset() - 1);
-
   TokenPosition position = ReadPosition();  // read position.
   if (p != NULL) *p = position;
 
@@ -4371,14 +4368,10 @@ Fragment StreamingFlowGraphBuilder::BuildAsExpression(TokenPosition* p) {
 
   Fragment instructions = BuildExpression();  // read operand.
 
-  const bool skipCheck = input_type.IsSkipCheck();
-
   const AbstractType& type = T.BuildType();  // read type.
   if (type.IsInstantiated() && type.IsTopType()) {
     // We already evaluated the operand on the left and just leave it there as
     // the result of the `obj as dynamic` expression.
-  } else if (skipCheck) {
-    instructions += B->RedefinitionWithType(type);
   } else {
     // We do not care whether the 'as' cast as implicitly added by the frontend
     // or explicitly written by the user, in both cases we use an assert
