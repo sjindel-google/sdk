@@ -414,23 +414,28 @@ class TypeCheck extends Statement {
   TypeExpr type;
 
   // The Kernel which this TypeCheck corresponds to. Can be a
-  // VariableDeclaration or AsExpression.
+  // VariableDeclaration, AsExpression or Field.
+  //
+  // VariableDeclaration is used for parameter type-checks.
+  // Field is used for type-checks of parameters to implicit setters.
   final TreeNode node;
 
   final Type staticType;
 
-  // 'skippedOnUnchecked' is whether or not this parameter's type-check will
+  // 'isTestedOnlyOnCheckedEntryPoint' is whether or not this parameter's type-check will
   // occur on the "checked" entrypoint in the VM but will be skipped on
   // "unchecked" entrypoint.
-  bool skippedOnUnchecked;
+  bool isTestedOnlyOnCheckedEntryPoint;
 
-  VariableDeclaration get variable => node is VariableDeclaration ? node : null;
+  VariableDeclaration get parameter =>
+      node is VariableDeclaration ? node : null;
 
   bool canAlwaysSkip = true;
 
   TypeCheck(this.arg, this.type, this.node, this.staticType) {
     assertx(node != null);
-    skippedOnUnchecked = variable != null && !variable.isCovariant;
+    isTestedOnlyOnCheckedEntryPoint =
+        parameter != null && !parameter.isCovariant;
   }
 
   @override
@@ -470,7 +475,7 @@ class TypeCheck extends Statement {
     // checked.
     if (!canSkip) {
       canAlwaysSkip = false;
-      if (skippedOnUnchecked) {
+      if (isTestedOnlyOnCheckedEntryPoint) {
         callHandler.typeCheckTriggered();
       }
       if (kPrintTrace) {
@@ -624,8 +629,8 @@ class Summary {
     for (Statement statement in _statements) {
       if (statement is TypeCheck &&
           statement.canAlwaysSkip &&
-          statement.variable != null) {
-        params.add(statement.variable);
+          statement.parameter != null) {
+        params.add(statement.parameter);
       }
     }
     return params;

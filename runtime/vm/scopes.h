@@ -125,8 +125,8 @@ class LocalVariable : public ZoneAllocated {
   bool is_explicit_covariant_parameter() const {
     return is_explicit_covariant_parameter_;
   }
-  void set_is_explicit_covariant_parameter(bool value) {
-    is_explicit_covariant_parameter_ = value;
+  void set_is_explicit_covariant_parameter() {
+    is_explicit_covariant_parameter_ = true;
   }
 
   enum TypeCheckMode {

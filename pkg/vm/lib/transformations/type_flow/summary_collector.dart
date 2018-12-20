@@ -61,7 +61,7 @@ class _SummaryNormalizer extends StatementVisitor {
     }
 
     for (Statement st in statements) {
-      if (st is Call) {
+      if (st is Call || st is TypeCheck) {
         _normalizeExpr(st, false);
       } else if (st is Use) {
         _normalizeExpr(st.arg, true);
@@ -396,17 +396,19 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       }
 
       for (int i = 0; i < function.positionalParameters.length; ++i) {
+        final decl = function.positionalParameters[i];
         _declareParameter(
-            function.positionalParameters[i].name,
-            function.positionalParameters[i].isGenericCovariantImpl
+            decl.name,
+            _useTypeCheckForParameter(decl)
                 ? null
                 : useTypesFrom.positionalParameters[i].type,
             function.positionalParameters[i].initializer);
       }
       for (int i = 0; i < function.namedParameters.length; ++i) {
+        final decl = function.namedParameters[i];
         _declareParameter(
-            function.namedParameters[i].name,
-            function.namedParameters[i].isGenericCovariantImpl
+            decl.name,
+            _useTypeCheckForParameter(decl)
                 ? null
                 : useTypesFrom.namedParameters[i].type,
             function.namedParameters[i].initializer);
@@ -416,14 +418,14 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       for (int i = 0; i < function.positionalParameters.length; ++i) {
         final decl = function.positionalParameters[i];
         Join v = _declareVariable(decl,
-            useTypeCheck: decl.isGenericCovariantImpl || decl.isCovariant,
+            useTypeCheck: _useTypeCheckForParameter(decl),
             checkType: useTypesFrom.positionalParameters[i].type);
         v.values.add(_summary.statements[count++]);
       }
       for (int i = 0; i < function.namedParameters.length; ++i) {
         final decl = function.namedParameters[i];
         Join v = _declareVariable(decl,
-            useTypeCheck: decl.isGenericCovariantImpl || decl.isCovariant,
+            useTypeCheck: _useTypeCheckForParameter(decl),
             checkType: useTypesFrom.namedParameters[i].type);
         v.values.add(_summary.statements[count++]);
       }
@@ -472,6 +474,10 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     Statistics.summariesCreated++;
 
     return _summary;
+  }
+
+  bool _useTypeCheckForParameter(VariableDeclaration decl) {
+    return decl.isCovariant || decl.isGenericCovariantImpl;
   }
 
   Args<Type> rawArguments(Selector selector) {
@@ -606,7 +612,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
       variable = new TypeCheck(
           variable, runtimeType, decl, Type.fromStatic(decl.type));
       _summary.add(variable);
-      _summary.add(new Use(variable));
     }
 
     _variables[decl] = variable;
@@ -738,9 +743,6 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     TypeExpr result = new TypeCheck(operand, runtimeType, node, type);
     explicitCasts[node] = result;
     _summary.add(result);
-    // We have to throw an exception on a failing type-check even if the result
-    // is unused.
-    _addUse(result);
     return result;
   }
 

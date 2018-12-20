@@ -319,15 +319,6 @@ class AnnotateKernel extends RecursiveVisitor<Null> {
     _annotateCallSite(node);
     super.visitStaticGet(node);
   }
-
-  @override
-  visitAsExpression(AsExpression node) {
-    TypeCheck check = _typeFlowAnalysis.explicitCast(node);
-    if (check != null && check.canAlwaysSkip) {
-      _setInferredType(node, Type.nullableAny(), skipCheck: true);
-    }
-    super.visitAsExpression(node);
-  }
 }
 
 /// Tree shaking based on results of type flow analysis (TFA).
@@ -826,6 +817,16 @@ class _TreeShakerPass1 extends Transformer {
   @override
   TreeNode visitAssertInitializer(AssertInitializer node) {
     return _visitAssertNode(node);
+  }
+
+  @override
+  TreeNode visitAsExpression(AsExpression node) {
+    node.transformChildren(this);
+    TypeCheck check = shaker.typeFlowAnalysis.explicitCast(node);
+    if (check != null && check.canAlwaysSkip) {
+      return node.operand;
+    }
+    return node;
   }
 }
 
