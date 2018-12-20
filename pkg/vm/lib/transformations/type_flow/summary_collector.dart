@@ -738,6 +738,9 @@ class SummaryCollector extends RecursiveVisitor<TypeExpr> {
     TypeExpr result = new TypeCheck(operand, runtimeType, node, type);
     explicitCasts[node] = result;
     _summary.add(result);
+    // We have to throw an exception on a failing type-check even if the result
+    // is unused.
+    _addUse(result);
     return result;
   }
 
