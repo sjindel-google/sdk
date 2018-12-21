@@ -988,6 +988,8 @@ class _ClassHierarchyCache implements TypeHierarchy {
 
   int _classIdCounter = 0;
 
+  Class functionClass;
+
   final Map<DynamicSelector, _DynamicTargetSet> _dynamicTargets =
       <DynamicSelector, _DynamicTargetSet>{};
 
@@ -996,6 +998,7 @@ class _ClassHierarchyCache implements TypeHierarchy {
       : objectNoSuchMethod = hierarchy.getDispatchTarget(
             environment.coreTypes.objectClass, noSuchMethodName) {
     assertx(objectNoSuchMethod != null);
+    functionClass = environment.coreTypes.functionClass;
   }
 
   _ClassData getClassData(Class c) {
@@ -1004,8 +1007,11 @@ class _ClassHierarchyCache implements TypeHierarchy {
 
   _ClassData _createClassData(Class c) {
     final supertypes = new Set<_ClassData>();
-    for (var sup in c.supers) {
-      supertypes.addAll(getClassData(sup.classNode).supertypes);
+    for (final Supertype sup in c.supers) {
+      Class superClass = sup.classNode;
+      if (superClass != functionClass) {
+        supertypes.addAll(getClassData(superClass).supertypes);
+      }
     }
     return new _ClassData(++_classIdCounter, c, supertypes);
   }
@@ -1073,7 +1079,7 @@ class _ClassHierarchyCache implements TypeHierarchy {
     assertx(superType is InterfaceType, details: superType); // TODO(alexmarkov)
 
     // InterfaceTypes should be raw, since we don't handle type arguments
-    // (although frankly we can't distinguish between raw C and C<dynamic).
+    // (although frankly we can't distinguish between raw C and C<dynamic>.
     assertx((subType as InterfaceType)
         .typeArguments
         .every((t) => t == const DynamicType()));
