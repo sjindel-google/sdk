@@ -330,13 +330,6 @@ Future _runGlobalTransformations(
     if (errorDetector.hasCompilationErrors) return;
   }
 
-  // TODO(35069): avoid recomputing CSA by reading it from the platform files.
-  void ignoreAmbiguousSupertypes(cls, a, b) {}
-  final hierarchy = new ClassHierarchy(component,
-      onAmbiguousSupertypes: ignoreAmbiguousSupertypes);
-  call_site_annotator.transformLibraries(
-      component, component.libraries, coreTypes, hierarchy);
-
   if (useGlobalTypeFlowAnalysis) {
     globalTypeFlow.transformComponent(
         compilerOptions.target, coreTypes, component);
@@ -344,6 +337,13 @@ Future _runGlobalTransformations(
     devirtualization.transformComponent(coreTypes, component);
     no_dynamic_invocations_annotator.transformComponent(component);
   }
+
+  // TODO(35069): avoid recomputing CSA by reading it from the platform files.
+  void ignoreAmbiguousSupertypes(cls, a, b) {}
+  final hierarchy = new ClassHierarchy(component,
+      onAmbiguousSupertypes: ignoreAmbiguousSupertypes);
+  call_site_annotator.transformLibraries(
+      component, component.libraries, coreTypes, hierarchy);
 
   // We don't know yet whether gen_snapshot will want to do obfuscation, but if
   // it does it will need the obfuscation prohibitions.

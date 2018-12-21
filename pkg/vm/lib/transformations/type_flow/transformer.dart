@@ -489,6 +489,7 @@ class _TreeShakerTypeVisitor extends RecursiveVisitor<Null> {
 /// transforms unreachable calls into 'throw' expressions.
 class _TreeShakerPass1 extends Transformer {
   final TreeShaker shaker;
+  Procedure _unsafeCast;
 
   _TreeShakerPass1(this.shaker);
 
@@ -824,9 +825,17 @@ class _TreeShakerPass1 extends Transformer {
     node.transformChildren(this);
     TypeCheck check = shaker.typeFlowAnalysis.explicitCast(node);
     if (check != null && check.canAlwaysSkip) {
-      return node.operand;
+      return StaticInvocation(
+          unsafeCast, Arguments([node.operand], types: [node.type]));
     }
     return node;
+  }
+
+  Procedure get unsafeCast {
+    _unsafeCast ??= shaker.typeFlowAnalysis.environment.coreTypes.index
+        .getTopLevelMember('dart:_internal', 'unsafeCast');
+    assertx(_unsafeCast != null);
+    return _unsafeCast;
   }
 }
 
