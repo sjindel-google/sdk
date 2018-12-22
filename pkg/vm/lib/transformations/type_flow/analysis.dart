@@ -989,6 +989,7 @@ class _ClassHierarchyCache implements TypeHierarchy {
   int _classIdCounter = 0;
 
   Class functionClass;
+  Class closureClass;
 
   final Map<DynamicSelector, _DynamicTargetSet> _dynamicTargets =
       <DynamicSelector, _DynamicTargetSet>{};
@@ -999,6 +1000,8 @@ class _ClassHierarchyCache implements TypeHierarchy {
             environment.coreTypes.objectClass, noSuchMethodName) {
     assertx(objectNoSuchMethod != null);
     functionClass = environment.coreTypes.functionClass;
+    closureClass =
+        environment.coreTypes.index.getClass('dart:core', '_Closure');
   }
 
   _ClassData getClassData(Class c) {
@@ -1016,9 +1019,11 @@ class _ClassHierarchyCache implements TypeHierarchy {
       // This is supposed to read that *only* function types can be subtypes of
       // Function.
       //
+      // There is one exception for the VM-internal "_Closure" class.
+      //
       // TODO(35477): Remove this erroneous "implements/extends Function" clause
       // in the front-end.
-      if (superClass != functionClass) {
+      if (c == closureClass || superClass != functionClass) {
         supertypes.addAll(getClassData(superClass).supertypes);
       }
     }
