@@ -1009,6 +1009,15 @@ class _ClassHierarchyCache implements TypeHierarchy {
     final supertypes = new Set<_ClassData>();
     for (final Supertype sup in c.supers) {
       Class superClass = sup.classNode;
+      // Dart Language Spec. 19.4.4.14:
+      //
+      //   "Every function type is a subtype of the type Function."
+      //
+      // This is supposed to read that *only* function types can be subtypes of
+      // Function.
+      //
+      // TODO(35477): Remove this erroneous "implements/extends Function" clause
+      // in the front-end.
       if (superClass != functionClass) {
         supertypes.addAll(getClassData(superClass).supertypes);
       }
@@ -1079,7 +1088,7 @@ class _ClassHierarchyCache implements TypeHierarchy {
     assertx(superType is InterfaceType, details: superType); // TODO(alexmarkov)
 
     // InterfaceTypes should be raw, since we don't handle type arguments
-    // (although frankly we can't distinguish between raw C and C<dynamic>.
+    // (although frankly we can't distinguish between raw C and C<dynamic>).
     assertx((subType as InterfaceType)
         .typeArguments
         .every((t) => t == const DynamicType()));
