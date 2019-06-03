@@ -22,7 +22,7 @@ namespace dart {
 
 using compiler::ObjectPoolBuilder;
 
-DEFINE_FLAG(bool, disassemble_stubs, false, "Disassemble generated stubs.");
+DEFINE_FLAG(bool, disassemble_stubs, true, "Disassemble generated stubs.");
 DECLARE_FLAG(bool, precompiled_mode);
 
 DECLARE_FLAG(bool, enable_interpreter);

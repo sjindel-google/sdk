@@ -25,6 +25,8 @@
 #define LOG_INFO(msg, ...)
 #endif  // defined(VIRTUAL_MEMORY_LOGGING)
 
+extern "C" int ptrace(int request, pid_t pid, caddr_t addr, int data);
+
 namespace dart {
 
 // standard MAP_FAILED causes "error: use of old-style cast" as it
@@ -39,6 +41,10 @@ uword VirtualMemory::page_size_ = 0;
 
 void VirtualMemory::Init() {
   page_size_ = getpagesize();
+
+#if defined(HOST_OS_IOS)
+  ptrace(/*PT_TRACE_ME*/0, 0, nullptr, 0);
+#endif
 
 #if defined(DUAL_MAPPING_SUPPORTED)
   // Detect dual mapping exec permission limitation on some platforms,

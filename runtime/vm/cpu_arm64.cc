@@ -25,7 +25,10 @@ namespace dart {
 void CPU::FlushICache(uword start, uword size) {
 #if HOST_OS_IOS
   // Precompilation never patches code so there should be no I cache flushes.
-  UNREACHABLE();
+  extern void __clear_cache(char*, char*);
+  char* beg = reinterpret_cast<char*>(start);
+  char* end = reinterpret_cast<char*>(start + size);
+  ::__clear_cache(beg, end);
 #endif
 
 #if !defined(USING_SIMULATOR) && !HOST_OS_IOS
